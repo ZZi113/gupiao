@@ -103,14 +103,16 @@ def inject_theme() -> None:
         <style>
         :root {
             --surface: #ffffff;
-            --page: #f5f7fb;
-            --line: #dbe3ef;
+            --page: #f3f5f8;
+            --line: #dde3ea;
             --line-strong: #cbd5e1;
             --ink: #0f172a;
             --muted: #64748b;
             --primary: #ef4444;
             --primary-soft: #fff1f2;
             --green: #16a34a;
+            --terminal: #111827;
+            --terminal-2: #1f2937;
         }
 
         .stApp {
@@ -119,13 +121,13 @@ def inject_theme() -> None:
         }
 
         .block-container {
-            max-width: 1680px;
-            padding-top: 2rem;
+            max-width: 1720px;
+            padding-top: 1.2rem;
             padding-bottom: 3rem;
         }
 
         section[data-testid="stSidebar"] {
-            background: #eef2f7;
+            background: #edf1f6;
             border-right: 1px solid var(--line);
         }
 
@@ -135,34 +137,47 @@ def inject_theme() -> None:
             letter-spacing: 0;
         }
 
+        section[data-testid="stSidebar"] textarea,
+        section[data-testid="stSidebar"] input {
+            border-radius: 7px;
+        }
+
+        section[data-testid="stSidebar"] [data-testid="stDataFrame"] {
+            border-color: #cfd8e3;
+        }
+
         .app-header {
             display: flex;
-            align-items: flex-end;
+            align-items: center;
             justify-content: space-between;
             gap: 24px;
-            padding: 14px 0 18px;
-            margin-bottom: 14px;
-            border-bottom: 1px solid var(--line);
+            background: linear-gradient(135deg, var(--terminal), var(--terminal-2));
+            border: 1px solid #0b1220;
+            border-radius: 8px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+            margin-bottom: 12px;
+            padding: 18px 20px;
         }
 
         .app-eyebrow {
-            margin-bottom: 8px;
-            color: var(--primary);
-            font-size: 13px;
+            color: #fca5a5;
+            font-size: 12px;
             font-weight: 700;
+            letter-spacing: 0.08em;
+            margin-bottom: 7px;
         }
 
         .app-header h1 {
             margin: 0;
-            color: var(--ink);
-            font-size: 34px;
+            color: #f8fafc;
+            font-size: 28px;
             line-height: 1.2;
             letter-spacing: 0;
         }
 
         .app-header p {
             margin: 8px 0 0;
-            color: var(--muted);
+            color: #cbd5e1;
             font-size: 14px;
         }
 
@@ -175,26 +190,61 @@ def inject_theme() -> None:
         }
 
         .header-pill {
-            background: var(--surface);
-            border: 1px solid var(--line);
-            border-radius: 999px;
-            color: #334155;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 6px;
+            color: #e2e8f0;
             font-size: 13px;
             font-weight: 600;
-            padding: 7px 11px;
+            padding: 8px 10px;
             white-space: nowrap;
         }
 
         .section-note {
-            background: #eaf3ff;
-            border: 1px solid #d8e8ff;
-            border-left: 4px solid #3b82f6;
+            background: #ffffff;
+            border: 1px solid var(--line);
+            border-left: 4px solid #2563eb;
             border-radius: 8px;
-            color: #24527a;
+            color: #334155;
             font-size: 14px;
             line-height: 1.7;
             margin: 8px 0 16px;
             padding: 10px 13px;
+        }
+
+        .page-header {
+            align-items: flex-end;
+            border-bottom: 1px solid var(--line);
+            display: flex;
+            justify-content: space-between;
+            gap: 18px;
+            margin: 18px 0 14px;
+            padding-bottom: 10px;
+        }
+
+        .page-header h2 {
+            color: var(--ink);
+            font-size: 24px;
+            line-height: 1.25;
+            letter-spacing: 0;
+            margin: 0;
+        }
+
+        .page-header p {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 6px 0 0;
+        }
+
+        .page-tag {
+            background: #f8fafc;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            color: #475569;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 6px 9px;
+            white-space: nowrap;
         }
 
         div[data-testid="stMetric"] {
@@ -202,7 +252,7 @@ def inject_theme() -> None:
             border: 1px solid var(--line);
             border-radius: 8px;
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-            padding: 14px 16px;
+            padding: 12px 14px;
         }
 
         div[data-testid="stMetricLabel"] p {
@@ -212,7 +262,7 @@ def inject_theme() -> None:
 
         div[data-testid="stMetricValue"] {
             color: var(--ink);
-            font-size: 28px;
+            font-size: 26px;
             line-height: 1.1;
         }
 
@@ -226,18 +276,22 @@ def inject_theme() -> None:
         div[data-testid="stRadio"] [role="radiogroup"] {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
-            margin: 4px 0 16px;
+            gap: 0;
+            margin: 0 0 18px;
+            background: #ffffff;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 4px;
         }
 
         div[data-testid="stRadio"] [role="radiogroup"] label {
-            background: var(--surface);
-            border: 1px solid var(--line);
-            border-radius: 999px;
-            box-shadow: 0 1px 1px rgba(15, 23, 42, 0.03);
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            box-shadow: none;
             color: #334155;
-            min-height: 34px;
-            padding: 6px 12px;
+            min-height: 32px;
+            padding: 5px 11px;
         }
 
         div[data-testid="stRadio"] [role="radiogroup"] label:has(input:checked) {
@@ -255,6 +309,7 @@ def inject_theme() -> None:
         div[data-testid="stDownloadButton"] button {
             border-radius: 7px;
             font-weight: 650;
+            min-height: 36px;
         }
 
         .action-card {
@@ -263,8 +318,8 @@ def inject_theme() -> None:
             border-left-width: 5px;
             border-radius: 8px;
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-            min-height: 118px;
-            padding: 14px 16px;
+            min-height: 108px;
+            padding: 13px 15px;
         }
 
         .action-card-meta {
@@ -289,6 +344,19 @@ def inject_theme() -> None:
 
         .stAlert {
             border-radius: 8px;
+        }
+
+        h3 {
+            color: var(--ink);
+            font-size: 18px;
+            letter-spacing: 0;
+            margin-top: 1.15rem;
+        }
+
+        h4 {
+            color: #1e293b;
+            font-size: 15px;
+            letter-spacing: 0;
         }
 
         @media (max-width: 900px) {
@@ -319,16 +387,33 @@ def render_app_header(code_count: int, days: int, realtime: bool, auto_refresh: 
         f"""
         <div class="app-header">
             <div>
-                <div class="app-eyebrow">A股研究工作台</div>
+                <div class="app-eyebrow">A-SHARE RESEARCH DESK</div>
                 <h1>A股个人投资操作助手</h1>
-                <p>行情、资金流、财务、新闻公告和规则研判统一查看。仅供研究，不构成投资建议。</p>
+                <p>自选池监控、结构分析、风险线和候选发现集中在一个操作台。仅供研究，不构成投资建议。</p>
             </div>
             <div class="header-pills">
-                <span class="header-pill">自选股 {code_count} 只</span>
-                <span class="header-pill">周期 {days} 日</span>
+                <span class="header-pill">WATCHLIST {code_count}</span>
+                <span class="header-pill">WINDOW {days}D</span>
                 <span class="header-pill">{escape(realtime_text)}</span>
                 <span class="header-pill">{escape(refresh_text)}</span>
             </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_page_header(title: str, subtitle: str = "", tag: str = "") -> None:
+    subtitle_html = f"<p>{escape(subtitle)}</p>" if subtitle else ""
+    tag_html = f'<span class="page-tag">{escape(tag)}</span>' if tag else ""
+    st.markdown(
+        f"""
+        <div class="page-header">
+            <div>
+                <h2>{escape(title)}</h2>
+                {subtitle_html}
+            </div>
+            {tag_html}
         </div>
         """,
         unsafe_allow_html=True,
@@ -832,7 +917,7 @@ page_options = ["自选股扫描", "个股分析", "资金财务新闻", "简单
 current_page = st.radio("功能导航", page_options, index=0, horizontal=True, label_visibility="collapsed")
 
 if current_page == "自选股扫描":
-    st.subheader("自选股扫描")
+    render_page_header("自选股扫描", "快速检查自选池里的趋势、风险和操作方向。", "WATCHLIST")
     render_section_note("当前为快速扫描模式，只拉行情和技术指标；ROE、资金流、新闻公告请进入“个股分析”或“资金财务新闻”查看。")
     results = scan_watchlist(codes, days, holdings, realtime, refresh_key, code_labels)
     brief = build_market_brief(results)
@@ -842,8 +927,9 @@ if current_page == "自选股扫描":
     cols[2].metric("持有/观察", brief["watch_count"])
     cols[3].metric("减仓/回避", brief["risk_count"], f"均分 {brief['avg_score']:.1f}")
 
+    st.markdown("### 信号明细")
     st.dataframe(make_summary_table(results), use_container_width=True, hide_index=True, height=270)
-    st.markdown("#### 重点卡片")
+    st.markdown("### 重点信号")
     card_cols = st.columns(3)
     for idx, item in enumerate(results[:6]):
         with card_cols[idx % 3]:
@@ -851,7 +937,7 @@ if current_page == "自选股扫描":
             st.write("；".join(item["reasons"][:3]))
 
 elif current_page == "个股分析":
-    st.subheader("个股分析")
+    render_page_header("个股分析", "查看单只股票的技术结构、交易计划、风险提示和指标快照。", "DETAIL")
     selected_code = st.selectbox("选择股票", codes, format_func=lambda x: format_stock_option(x, code_labels))
     holding = holding_map_from_table(holdings).get(selected_code)
     df, profile, source = load_stock(selected_code, days, realtime, refresh_key, "analysis")
@@ -896,7 +982,7 @@ elif current_page == "个股分析":
     st.markdown(report)
 
 elif current_page == "资金财务新闻":
-    st.subheader("资金、财务、新闻公告")
+    render_page_header("资金、财务、新闻公告", "把资金流、财务质量、新闻和公告放在同一屏复核。", "DATA")
     selected_code = st.selectbox("选择股票查看明细", codes, key="detail_code", format_func=lambda x: format_stock_option(x, code_labels))
     df, profile, source = load_stock(selected_code, days, realtime, refresh_key)
     result = analyze_stock(selected_code, df, profile, holding=holding_map_from_table(holdings).get(selected_code))
@@ -915,7 +1001,7 @@ elif current_page == "资金财务新闻":
     render_news_table(profile.get("notices"), "公告")
 
 elif current_page == "简单回测":
-    st.subheader("简单回测")
+    render_page_header("简单回测", "用固定规则粗略验证均线趋势策略在历史区间里的表现。", "BACKTEST")
     selected_code = st.selectbox("选择股票回测", codes, key="bt_code", format_func=lambda x: format_stock_option(x, code_labels))
     df, profile, source = load_stock(selected_code, days, False, 0, "history")
     bt = run_ma_backtest(df)
@@ -935,7 +1021,7 @@ elif current_page == "简单回测":
     st.caption("回测规则：站上20/60日均线且MACD为正时买入；跌破20日线、止损或过热止盈时卖出。")
 
 elif current_page == "板块轮动":
-    st.subheader("板块轮动")
+    render_page_header("板块轮动", "观察行业强弱和自选池行业集中度。", "SECTOR")
     boards, board_source = load_boards()
     st.caption(f"数据源：{board_source}")
     if boards.empty:
@@ -954,7 +1040,7 @@ elif current_page == "板块轮动":
     st.dataframe(industry_table, use_container_width=True, hide_index=True)
 
 elif current_page == "每日操作清单":
-    st.subheader(f"每日操作清单 - {date.today().isoformat()}")
+    render_page_header("每日操作清单", "按买入、观察、减仓回避分组整理当天要看的动作。", date.today().isoformat())
     results = scan_watchlist(codes, days, holdings, realtime, refresh_key, code_labels)
     groups = {
         "可以买入/小仓试探": [x for x in results if x["action"] in {"buy", "trial_buy"}],
@@ -972,7 +1058,7 @@ elif current_page == "每日操作清单":
             st.caption("；".join(item["reasons"][:3]))
 
 elif current_page == "多智能体研判":
-    st.subheader("多智能体研判")
+    render_page_header("多智能体研判", "从技术、资金、基本面、新闻和风控多个角度交叉复核。", "REVIEW")
     selected_code = st.selectbox("选择股票进行研判", codes, key="agent_code", format_func=lambda x: format_stock_option(x, code_labels))
     df, profile, source = load_stock(selected_code, days, realtime, refresh_key)
     result = analyze_stock(selected_code, df, profile, holding=holding_map_from_table(holdings).get(selected_code))
@@ -1033,8 +1119,8 @@ elif current_page == "多智能体研判":
     )
 
 elif current_page == "优质股票发现":
-    st.subheader("优质股票发现")
-    st.caption("先用全市场快照粗筛，再对前排候选做技术、资金、财务、新闻和风险复核。仅用于缩小研究范围，不构成买卖建议。")
+    render_page_header("优质股票发现", "先用全市场快照粗筛，再对前排候选做技术、资金、财务、新闻和风险复核。", "DISCOVERY")
+    render_section_note("这个页面只用于缩小研究范围，不构成买卖建议。真正操作仍要结合仓位、风险线和市场环境。")
 
     mode_options = list(MODE_LABELS.keys())
     discover_mode = st.selectbox(
@@ -1188,7 +1274,7 @@ elif current_page == "优质股票发现":
         st.info("点击“开始扫描优质候选”，系统会从市场快照里筛出一批更值得进一步研究的股票。")
 
 elif current_page == "规则说明":
-    st.subheader("规则说明")
+    render_page_header("规则说明", "说明当前系统如何打分、如何判断风险，以及哪些数据会影响结论。", "RULES")
     st.write(
         """
         这一版不再只看技术指标，而是把数据拆成几层独立判断：
