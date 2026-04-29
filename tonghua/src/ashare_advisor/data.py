@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
 import re
-from datetime import date, timedelta
+import time
+from datetime import date, datetime, timedelta
 from typing import Iterable
 
 import pandas as pd
+import requests
 
 from .indicators import add_indicators
 from .sample_data import SAMPLE_NAMES, make_sample_profile, make_sample_stock
@@ -57,6 +60,34 @@ def _safe_date(value):
         return pd.NaT
 
 
+def _request_json(url: str, params: dict, headers: dict | None = None, timeout: int = 12) -> dict:
+    last_error: Exception | None = None
+    for trust_env in (True, False):
+        try:
+            session = requests.Session()
+            session.trust_env = trust_env
+            response = session.get(url, params=params, headers=headers or {}, timeout=timeout)
+            response.raise_for_status()
+            return response.json()
+        except Exception as exc:
+            last_error = exc
+    raise last_error or RuntimeError("request failed")
+
+
+def _request_text(url: str, params: dict, headers: dict | None = None, timeout: int = 12) -> str:
+    last_error: Exception | None = None
+    for trust_env in (True, False):
+        try:
+            session = requests.Session()
+            session.trust_env = trust_env
+            response = session.get(url, params=params, headers=headers or {}, timeout=timeout)
+            response.raise_for_status()
+            return response.text
+        except Exception as exc:
+            last_error = exc
+    raise last_error or RuntimeError("request failed")
+
+
 class DataProvider:
     def __init__(self) -> None:
         try:
@@ -72,11 +103,15 @@ class DataProvider:
             {
                 "code": code,
                 "data_warnings": [],
+                "data_notes": [],
                 "realtime": {},
                 "financial": {},
                 "fund_flow": pd.DataFrame(),
+                "fund_flow_source": "",
                 "news": pd.DataFrame(),
+                "news_source": "",
                 "notices": pd.DataFrame(),
+                "notice_source": "",
             }
         )
 
@@ -341,34 +376,200 @@ class DataProvider:
             profile["data_warnings"].append(f"财务指标接口不可用：{type(exc).__name__}")
 
     def _enrich_fund_flow(self, code: str, profile: dict) -> None:
-        try:
-            raw = self.ak.stock_individual_fund_flow(stock=code, market=market_prefix(code))
-            if raw.empty:
-                return
-            df = raw.copy()
-            df["日期"] = pd.to_datetime(df["日期"], errors="coerce")
-            for col in df.columns:
-                if col != "日期":
-                    df[col] = pd.to_numeric(df[col], errors="coerce")
-            profile["fund_flow"] = df.dropna(subset=["日期"]).sort_values("日期").tail(80)
-        except Exception as exc:
-            profile["data_warnings"].append(f"资金流接口不可用：{type(exc).__name__}")
+        errors: list[str] = []
+        loaders = [
+            ("东方财富资金流直连", lambda: self._load_fund_flow_eastmoney(code)),
+            ("AKShare资金流", lambda: self.ak.stock_individual_fund_flow(stock=code, market=market_prefix(code))),
+        ]
+        for source, loader in loaders:
+            try:
+                raw = loader()
+                df = self._normalize_fund_flow(raw)
+                if not df.empty:
+                    profile["fund_flow"] = df.tail(80)
+                    profile["fund_flow_source"] = source
+                    return
+            except Exception as exc:
+                errors.append(f"{source}:{type(exc).__name__}")
+        profile["data_warnings"].append(f"资金流数据源全部失败：{'；'.join(errors)}")
+
+    def _load_fund_flow_eastmoney(self, code: str) -> pd.DataFrame:
+        market_map = {"sh": 1, "sz": 0, "bj": 0}
+        url = "https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get"
+        params = {
+            "lmt": "0",
+            "klt": "101",
+            "secid": f"{market_map[market_prefix(code)]}.{code}",
+            "fields1": "f1,f2,f3,f7",
+            "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63,f64,f65",
+            "ut": "b2884a393a59ad64002292a3e90d46a5",
+            "_": int(time.time() * 1000),
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/122.0 Safari/537.36",
+            "Referer": "https://data.eastmoney.com/zjlx/detail.html",
+        }
+        data = _request_json(url, params=params, headers=headers)
+        klines = ((data or {}).get("data") or {}).get("klines") or []
+        if not klines:
+            return pd.DataFrame()
+        df = pd.DataFrame([item.split(",") for item in klines])
+        df.columns = [
+            "日期",
+            "主力净流入-净额",
+            "小单净流入-净额",
+            "中单净流入-净额",
+            "大单净流入-净额",
+            "超大单净流入-净额",
+            "主力净流入-净占比",
+            "小单净流入-净占比",
+            "中单净流入-净占比",
+            "大单净流入-净占比",
+            "超大单净流入-净占比",
+            "收盘价",
+            "涨跌幅",
+            "_1",
+            "_2",
+        ]
+        return df
+
+    def _normalize_fund_flow(self, raw: pd.DataFrame) -> pd.DataFrame:
+        if not isinstance(raw, pd.DataFrame) or raw.empty:
+            return pd.DataFrame()
+        df = raw.copy()
+        keep = [
+            "日期",
+            "收盘价",
+            "涨跌幅",
+            "主力净流入-净额",
+            "主力净流入-净占比",
+            "超大单净流入-净额",
+            "超大单净流入-净占比",
+            "大单净流入-净额",
+            "大单净流入-净占比",
+            "中单净流入-净额",
+            "中单净流入-净占比",
+            "小单净流入-净额",
+            "小单净流入-净占比",
+        ]
+        for col in keep:
+            if col not in df:
+                df[col] = pd.NaT if col == "日期" else None
+        df = df[keep].copy()
+        df["日期"] = pd.to_datetime(df["日期"], errors="coerce")
+        for col in keep:
+            if col != "日期":
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+        return df.dropna(subset=["日期"]).sort_values("日期")
 
     def _enrich_news(self, code: str, profile: dict) -> None:
-        try:
-            raw = self.ak.stock_news_em(symbol=code)
-            if raw.empty:
-                return
-            title_col = "新闻标题" if "新闻标题" in raw.columns else raw.columns[0]
-            name = str(profile.get("name") or "")
-            title = raw[title_col].astype(str)
-            mask = title.str.contains(code, regex=False)
-            if name and name != code:
-                mask = mask | title.str.contains(name, regex=False)
-            filtered = raw[mask].copy()
-            profile["news"] = (filtered if not filtered.empty else raw).head(12).copy()
-        except Exception as exc:
-            profile["data_warnings"].append(f"新闻接口不可用：{type(exc).__name__}")
+        errors: list[str] = []
+        loaders = [
+            ("东方财富新闻直连", lambda: self._load_news_eastmoney(code, profile)),
+            ("AKShare东方财富新闻", lambda: self.ak.stock_news_em(symbol=code)),
+            ("财新数据通", lambda: self.ak.stock_news_main_cx()),
+        ]
+        for source, loader in loaders:
+            try:
+                raw = loader()
+                if isinstance(raw, pd.DataFrame) and not raw.empty:
+                    filtered = self._filter_news_frame(raw, code, profile)
+                    if not filtered.empty:
+                        profile["news"] = filtered.head(12).copy()
+                        profile["news_source"] = source
+                        return
+            except Exception as exc:
+                errors.append(f"{source}:{type(exc).__name__}")
+
+        profile["data_notes"] = profile.get("data_notes", [])
+        detail = "、".join(dict.fromkeys(errors)) or "无返回"
+        profile["data_warnings"].append(f"新闻数据源全部失败：{detail}")
+
+    def _load_news_eastmoney(self, code: str, profile: dict) -> pd.DataFrame:
+        callback = f"jQuery{int(time.time() * 1000)}"
+        keyword = code
+        name = str(profile.get("name") or "")
+        if name and name not in {code, f"股票{code}"}:
+            keyword = name
+        inner_param = {
+            "uid": "",
+            "keyword": keyword,
+            "type": ["cmsArticleWebOld"],
+            "client": "web",
+            "clientType": "web",
+            "clientVersion": "curr",
+            "param": {
+                "cmsArticleWebOld": {
+                    "searchScope": "default",
+                    "sort": "default",
+                    "pageIndex": 1,
+                    "pageSize": 20,
+                    "preTag": "",
+                    "postTag": "",
+                }
+            },
+        }
+        url = "https://search-api-web.eastmoney.com/search/jsonp"
+        params = {
+            "cb": callback,
+            "param": json.dumps(inner_param, ensure_ascii=False),
+            "_": int(time.time() * 1000),
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/122.0 Safari/537.36",
+            "Referer": f"https://so.eastmoney.com/news/s?keyword={keyword}",
+        }
+        text = _request_text(url, params=params, headers=headers)
+        left = text.find("(")
+        right = text.rfind(")")
+        if left == -1 or right == -1 or right <= left:
+            raise ValueError("invalid eastmoney jsonp")
+        data = json.loads(text[left + 1 : right])
+        rows = ((data or {}).get("result") or {}).get("cmsArticleWebOld") or []
+        if not rows:
+            return pd.DataFrame()
+        df = pd.DataFrame(rows)
+        link_code = df.get("code", pd.Series([""] * len(df))).astype(str)
+        df["新闻链接"] = "http://finance.eastmoney.com/a/" + link_code + ".html"
+        df = df.rename(
+            columns={
+                "date": "发布时间",
+                "mediaName": "文章来源",
+                "title": "新闻标题",
+                "content": "新闻内容",
+            }
+        )
+        for col in ["新闻标题", "新闻内容"]:
+            if col in df:
+                df[col] = (
+                    df[col]
+                    .astype(str)
+                    .str.replace(r"<[^>]+>", "", regex=True)
+                    .str.replace(r"\u3000", "", regex=True)
+                    .str.replace(r"\r\n", " ", regex=True)
+                )
+        df["关键词"] = keyword
+        keep = [col for col in ["关键词", "新闻标题", "新闻内容", "发布时间", "文章来源", "新闻链接"] if col in df.columns]
+        return df[keep].copy() if keep else df
+
+    def _filter_news_frame(self, raw: pd.DataFrame, code: str, profile: dict) -> pd.DataFrame:
+        df = raw.copy()
+        name = str(profile.get("name") or "")
+        text_cols = [
+            col
+            for col in ["新闻标题", "标题", "内容", "新闻内容", "摘要", "文章来源", "source", "title"]
+            if col in df.columns
+        ]
+        if not text_cols:
+            text_cols = list(df.columns[: min(3, len(df.columns))])
+        text = df[text_cols].astype(str).agg(" ".join, axis=1)
+        mask = text.str.contains(code, regex=False, na=False)
+        if name and name != code:
+            mask = mask | text.str.contains(name, regex=False, na=False)
+        filtered = df[mask].copy()
+        return filtered if not filtered.empty else df
 
     def _enrich_notices(self, code: str, profile: dict) -> None:
         start = (date.today() - timedelta(days=120)).strftime("%Y-%m-%d")
@@ -382,6 +583,7 @@ class DataProvider:
             )
             if not raw.empty:
                 profile["notices"] = raw.head(12).copy()
+                profile["notice_source"] = "AKShare个股公告"
                 return
         except Exception:
             pass
@@ -394,6 +596,7 @@ class DataProvider:
             )
             if not raw.empty:
                 profile["notices"] = raw.head(12).copy()
+                profile["notice_source"] = "巨潮公告"
         except Exception as exc:
             profile["data_warnings"].append(f"公告接口不可用：{type(exc).__name__}")
 

@@ -20,7 +20,7 @@ from src.ashare_advisor.backtest import run_ma_backtest
 from src.ashare_advisor.data import DataProvider, normalize_codes
 from src.ashare_advisor.reporting import build_rule_report, generate_llm_report
 from src.ashare_advisor.rules import analyze_stock, build_market_brief
-from src.ashare_advisor.screener import MODE_LABELS, load_market_snapshot, screen_market_candidates
+from src.ashare_advisor.screener import MODE_DESCRIPTIONS, MODE_LABELS, load_market_snapshot, screen_market_candidates
 
 
 st.set_page_config(
@@ -150,10 +150,14 @@ def make_financial_table(financial: dict) -> pd.DataFrame:
 
 
 def friendly_data_warning(text: str) -> str:
+    if "资金流数据源全部失败" in text:
+        return text
+    if "新闻数据源全部失败" in text:
+        return text
     if "资金流接口不可用" in text:
-        return "资金流数据暂时不可用，已跳过资金面补充；稍后可点击“清空缓存并重新取数”。"
+        return "资金流接口暂未接通，已尝试备用源；稍后可点击“清空缓存并重新取数”。"
     if "新闻接口不可用" in text:
-        return "新闻数据暂时不可用，不影响行情、财务和技术面分析。"
+        return "新闻接口暂未接通，已尝试备用源。"
     if "公告接口不可用" in text:
         return "公告数据暂时不可用，不影响行情、财务和技术面分析。"
     if "财务指标接口不可用" in text:
@@ -172,6 +176,13 @@ def render_data_warnings(warnings: list[str]) -> None:
     with st.expander("数据源提示", expanded=False):
         for message in messages:
             st.write(f"- {message}")
+
+
+def render_source_status(profile: dict) -> None:
+    fund = profile.get("fund_flow_source") or "未接通"
+    news = profile.get("news_source") or "未接通"
+    notices = profile.get("notice_source") or "未接通"
+    st.caption(f"资金流：{fund}；新闻：{news}；公告：{notices}")
 
 
 def setup_auto_refresh(enabled: bool, interval_seconds: int) -> int:
@@ -523,6 +534,7 @@ with tabs[1]:
     with top_cols[0]:
         render_action_card(result)
         st.caption(f"数据源：{source}")
+        render_source_status(profile)
         warnings = profile.get("data_warnings", [])
         render_data_warnings(warnings[:5])
     with top_cols[1]:
@@ -569,6 +581,7 @@ with tabs[2]:
     df, profile, source = load_stock(selected_code, days, realtime, refresh_key)
     result = analyze_stock(selected_code, df, profile, holding=holding_map_from_table(holdings).get(selected_code))
     st.caption(f"数据源：{source}")
+    render_source_status(profile)
 
     left, right = st.columns([1, 1])
     with left:
@@ -653,6 +666,7 @@ with tabs[6]:
     top_cols[3].metric("规则综合分", f"{result['score']:.1f}")
 
     st.caption(f"数据源：{source}")
+    render_source_status(profile)
     render_data_warnings(profile.get("data_warnings", [])[:5])
 
     left, right = st.columns([1, 1])
@@ -709,7 +723,7 @@ with tabs[7]:
             list(MODE_LABELS.keys()),
             index=0,
             format_func=lambda x: MODE_LABELS[x],
-            help="稳健优质更均衡；趋势增强偏强势股；低估修复更重视估值。",
+            help="可以按不同研究方向切换，不是固定只找一种股票。",
         )
     with control_cols[1]:
         universe_limit = st.slider("初筛候选数", min_value=20, max_value=120, value=60, step=10)
@@ -718,13 +732,31 @@ with tabs[7]:
     with control_cols[3]:
         show_count = st.slider("展示数量", min_value=5, max_value=20, value=10, step=1)
 
+    st.info(f"{MODE_LABELS[discover_mode]}：{MODE_DESCRIPTIONS[discover_mode]}")
+    with st.expander("我是怎么筛选这些候选股的", expanded=False):
+        st.markdown(
+            """
+            这不是直接“预测哪只一定涨”，而是先把全市场缩小成值得研究的候选池：
+
+            1. 数据源优先级：东方财富全A实时快照直连，其次 AKShare 东方财富全市场快照，再用 AKShare 新浪全A实时快照；如果都失败，才会退到演示候选池。
+            2. 基础排除：先排除 ST、退市、新股标记、成交过低、极端估值、涨跌停附近和换手异常的股票。
+            3. 初筛打分：综合估值 PE/PB、流动性、60日趋势、当日强度、换手/量比/振幅、主力净流入和短期风险。
+            4. 风格权重：稳健优质更均衡，趋势增强更看动量，低估修复更看估值，资金关注更看成交和资金，突破/超跌用于找特定形态。
+            5. 深度复核：只对初筛前排做现有个股分析，再用技术面、资金面、基本面、新闻公告和风险经理多角色复核。
+            """
+        )
+
     run_discovery = st.button("开始扫描优质候选", type="primary", use_container_width=True)
     if run_discovery:
         snapshot, snapshot_source, snapshot_warnings = load_market_snapshot_cached(refresh_key)
         candidates = screen_market_candidates(snapshot, mode=discover_mode, limit=universe_limit)
         if snapshot_warnings:
             render_data_warnings(snapshot_warnings)
-        st.caption(f"候选池数据源：{snapshot_source}；初筛后 {len(candidates)} 只")
+        if "演示" in snapshot_source:
+            st.error("当前没有连上真实全A市场，只能使用演示候选池。所以候选数量会很少，结果不能当作真实选股结果。请点左侧“清空缓存并重新取数”，或重启应用后再试。")
+        elif "新浪" in snapshot_source:
+            st.info("当前使用新浪全A备用源，能覆盖真实全市场实时行情，但 PE/PB、60日涨跌幅等字段较少；系统会先用价格和成交额粗筛，再在深度复核时补充个股技术、资金、财务和新闻数据。")
+        st.caption(f"候选池数据源：{snapshot_source}；快照股票数 {len(snapshot)}；初筛展示 {len(candidates)} 只")
         if candidates.empty:
             st.warning("当前没有筛出候选股。可以换一个筛选风格，或稍后再重新取数。")
         else:
