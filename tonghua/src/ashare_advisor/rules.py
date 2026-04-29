@@ -178,9 +178,6 @@ def analyze_stock(code: str, frame: pd.DataFrame, profile: dict, holding: dict |
     score = _apply_fund_flow_score(profile, score, reasons, risks)
     score = _apply_news_score(profile, score, reasons, risks)
 
-    for warning in profile.get("data_warnings", [])[:2]:
-        risks.append(warning)
-
     material_risk_count = len([item for item in risks if "接口" not in item and "数据" not in item])
     if material_risk_count >= 4:
         score = min(score, 68)
