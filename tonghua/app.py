@@ -769,19 +769,25 @@ elif current_page == "优质股票发现":
     st.subheader("优质股票发现")
     st.caption("先用全市场快照粗筛，再对前排候选做技术、资金、财务、新闻和风险复核。仅用于缩小研究范围，不构成买卖建议。")
 
+    mode_options = list(MODE_LABELS.keys())
+    discover_mode = st.selectbox(
+        "筛选风格",
+        mode_options,
+        index=mode_options.index(st.session_state.get("quality_discover_mode", mode_options[0]))
+        if st.session_state.get("quality_discover_mode") in mode_options
+        else 0,
+        format_func=lambda x: MODE_LABELS[x],
+        key="quality_discover_mode",
+        help="可以按不同研究方向切换，不是固定只找一种股票。",
+    )
+    discover_mode = st.session_state.get("quality_discover_mode", discover_mode)
+    st.info(f"{MODE_LABELS[discover_mode]}：{MODE_DESCRIPTIONS[discover_mode]}")
+
     with st.form("quality_discovery_form"):
-        control_cols = st.columns([1, 1, 1, 1])
+        control_cols = st.columns([1, 1, 1])
         with control_cols[0]:
-            discover_mode = st.selectbox(
-                "筛选风格",
-                list(MODE_LABELS.keys()),
-                index=0,
-                format_func=lambda x: MODE_LABELS[x],
-                help="可以按不同研究方向切换，不是固定只找一种股票。",
-            )
-        with control_cols[1]:
             universe_limit = st.slider("初筛候选数", min_value=20, max_value=120, value=60, step=10)
-        with control_cols[2]:
+        with control_cols[1]:
             deep_review_count = st.slider(
                 "深度复核数",
                 min_value=3,
@@ -790,7 +796,7 @@ elif current_page == "优质股票发现":
                 step=1,
                 help="深度复核会逐只拉K线、资金、财务和新闻，数量越大越慢。",
             )
-        with control_cols[3]:
+        with control_cols[2]:
             show_count = st.slider("展示数量", min_value=5, max_value=20, value=10, step=1)
 
         scan_mode = st.radio(
@@ -801,7 +807,6 @@ elif current_page == "优质股票发现":
             help="快速初筛只做全市场快照打分；深度复核会逐只补充K线、资金、财务和新闻，结果更细但更慢。",
         )
 
-        st.info(f"{MODE_LABELS[discover_mode]}：{MODE_DESCRIPTIONS[discover_mode]}")
         with st.expander("我是怎么筛选这些候选股的", expanded=False):
             st.markdown(
                 """
