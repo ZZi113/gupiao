@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import time
 from datetime import date, datetime
+from html import escape
 from pathlib import Path
 
 import pandas as pd
@@ -94,6 +95,251 @@ def require_login() -> None:
 
 
 require_login()
+
+
+def inject_theme() -> None:
+    st.markdown(
+        """
+        <style>
+        :root {
+            --surface: #ffffff;
+            --page: #f5f7fb;
+            --line: #dbe3ef;
+            --line-strong: #cbd5e1;
+            --ink: #0f172a;
+            --muted: #64748b;
+            --primary: #ef4444;
+            --primary-soft: #fff1f2;
+            --green: #16a34a;
+        }
+
+        .stApp {
+            background: var(--page);
+            color: var(--ink);
+        }
+
+        .block-container {
+            max-width: 1680px;
+            padding-top: 2rem;
+            padding-bottom: 3rem;
+        }
+
+        section[data-testid="stSidebar"] {
+            background: #eef2f7;
+            border-right: 1px solid var(--line);
+        }
+
+        section[data-testid="stSidebar"] h1,
+        section[data-testid="stSidebar"] h2,
+        section[data-testid="stSidebar"] h3 {
+            letter-spacing: 0;
+        }
+
+        .app-header {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 14px 0 18px;
+            margin-bottom: 14px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .app-eyebrow {
+            margin-bottom: 8px;
+            color: var(--primary);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .app-header h1 {
+            margin: 0;
+            color: var(--ink);
+            font-size: 34px;
+            line-height: 1.2;
+            letter-spacing: 0;
+        }
+
+        .app-header p {
+            margin: 8px 0 0;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .header-pills {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 8px;
+            min-width: 360px;
+        }
+
+        .header-pill {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            color: #334155;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 7px 11px;
+            white-space: nowrap;
+        }
+
+        .section-note {
+            background: #eaf3ff;
+            border: 1px solid #d8e8ff;
+            border-left: 4px solid #3b82f6;
+            border-radius: 8px;
+            color: #24527a;
+            font-size: 14px;
+            line-height: 1.7;
+            margin: 8px 0 16px;
+            padding: 10px 13px;
+        }
+
+        div[data-testid="stMetric"] {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+            padding: 14px 16px;
+        }
+
+        div[data-testid="stMetricLabel"] p {
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        div[data-testid="stMetricValue"] {
+            color: var(--ink);
+            font-size: 28px;
+            line-height: 1.1;
+        }
+
+        div[data-testid="stDataFrame"] {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        div[data-testid="stRadio"] [role="radiogroup"] {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 4px 0 16px;
+        }
+
+        div[data-testid="stRadio"] [role="radiogroup"] label {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            box-shadow: 0 1px 1px rgba(15, 23, 42, 0.03);
+            color: #334155;
+            min-height: 34px;
+            padding: 6px 12px;
+        }
+
+        div[data-testid="stRadio"] [role="radiogroup"] label:has(input:checked) {
+            background: var(--primary-soft);
+            border-color: var(--primary);
+            color: #b91c1c;
+            font-weight: 700;
+        }
+
+        div[data-testid="stRadio"] [role="radiogroup"] label > div:first-child {
+            display: none;
+        }
+
+        div[data-testid="stButton"] button,
+        div[data-testid="stDownloadButton"] button {
+            border-radius: 7px;
+            font-weight: 650;
+        }
+
+        .action-card {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-left-width: 5px;
+            border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+            min-height: 118px;
+            padding: 14px 16px;
+        }
+
+        .action-card-meta {
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.4;
+            margin-bottom: 6px;
+        }
+
+        .action-card-title {
+            font-size: 24px;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-bottom: 8px;
+        }
+
+        .action-card-score {
+            color: #334155;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .stAlert {
+            border-radius: 8px;
+        }
+
+        @media (max-width: 900px) {
+            .app-header {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .header-pills {
+                justify-content: flex-start;
+                min-width: 0;
+            }
+
+            .app-header h1 {
+                font-size: 28px;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_app_header(code_count: int, days: int, realtime: bool, auto_refresh: bool, refresh_seconds: int) -> None:
+    realtime_text = "分钟线开启" if realtime else "快速日线模式"
+    refresh_text = f"{refresh_seconds} 秒自动刷新" if realtime and auto_refresh else "手动刷新"
+    st.markdown(
+        f"""
+        <div class="app-header">
+            <div>
+                <div class="app-eyebrow">A股研究工作台</div>
+                <h1>A股个人投资操作助手</h1>
+                <p>行情、资金流、财务、新闻公告和规则研判统一查看。仅供研究，不构成投资建议。</p>
+            </div>
+            <div class="header-pills">
+                <span class="header-pill">自选股 {code_count} 只</span>
+                <span class="header-pill">周期 {days} 日</span>
+                <span class="header-pill">{escape(realtime_text)}</span>
+                <span class="header-pill">{escape(refresh_text)}</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_section_note(text: str) -> None:
+    st.markdown(f'<div class="section-note">{escape(text)}</div>', unsafe_allow_html=True)
+
+
+inject_theme()
 
 
 @st.cache_data(show_spinner=False, ttl=60 * 5)
@@ -257,6 +503,9 @@ def plot_price(df: pd.DataFrame, title: str) -> go.Figure:
             )
     fig.update_layout(
         title=title,
+        template="plotly_white",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#ffffff",
         height=460,
         margin=dict(l=12, r=12, t=48, b=12),
         xaxis_rangeslider_visible=False,
@@ -277,7 +526,14 @@ def plot_fund_flow(fund: pd.DataFrame) -> go.Figure:
                 marker_color=["#dc2626" if v >= 0 else "#16a34a" for v in recent["主力净流入-净额"]],
             )
         )
-    fig.update_layout(height=320, margin=dict(l=12, r=12, t=32, b=12), title="近40日主力资金流")
+    fig.update_layout(
+        height=320,
+        margin=dict(l=12, r=12, t=32, b=12),
+        title="近40日主力资金流",
+        template="plotly_white",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#ffffff",
+    )
     return fig
 
 
@@ -285,18 +541,30 @@ def plot_backtest(equity: pd.DataFrame) -> go.Figure:
     fig = go.Figure()
     if not equity.empty:
         fig.add_trace(go.Scatter(x=equity["date"], y=equity["equity"], mode="lines", name="策略权益"))
-    fig.update_layout(height=320, margin=dict(l=12, r=12, t=32, b=12), title="策略权益曲线")
+    fig.update_layout(
+        height=320,
+        margin=dict(l=12, r=12, t=32, b=12),
+        title="策略权益曲线",
+        template="plotly_white",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#ffffff",
+    )
     return fig
 
 
 def render_action_card(result: dict, compact: bool = False) -> None:
     color = result["color"]
+    industry = result.get("industry", "未知")
+    meta = escape(f"{result['code']} {result['name']} / {industry}")
+    action_label = escape(str(result["action_label"]))
+    risk_level = escape(str(result["risk_level"]))
+    confidence = escape(str(result["confidence"]))
     st.markdown(
         f"""
-        <div style="border-left: 6px solid {color}; padding: 12px 14px; background: #f8fafc; border-radius: 6px;">
-            <div style="font-size: 14px; color: #64748b;">{result['code']} {result['name']} / {result.get('industry', '未知')}</div>
-            <div style="font-size: 24px; font-weight: 700; color: {color};">{result['action_label']}</div>
-            <div style="font-size: 14px; color: #334155;">综合分 {result['score']:.1f} / 风险 {result['risk_level']} / 置信度 {result['confidence']}</div>
+        <div class="action-card" style="border-left-color: {color};">
+            <div class="action-card-meta">{meta}</div>
+            <div class="action-card-title" style="color: {color};">{action_label}</div>
+            <div class="action-card-score">综合分 {result['score']:.1f} / 风险 {risk_level} / 置信度 {confidence}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -502,9 +770,6 @@ def build_quality_reviews(
     return sorted(rows, key=lambda item: item["机会分"], reverse=True)
 
 
-st.title("A股个人投资操作助手")
-st.caption("实时行情、资金流、财务、新闻公告和简单回测组合判断。仅供研究，不构成投资建议。")
-
 with st.sidebar:
     st.header("股票池")
     if get_config_value("APP_PASSWORD") and st.session_state.get("authenticated"):
@@ -542,6 +807,7 @@ with st.sidebar:
         st.cache_data.clear()
         st.rerun()
 
+    st.divider()
     st.subheader("持仓，可选")
     holdings = st.data_editor(
         pd.DataFrame([{"code": "", "cost": 0.0, "weight": 0.0}]),
@@ -560,13 +826,14 @@ if not codes:
     st.stop()
 code_labels = load_code_labels(tuple(codes))
 refresh_key = setup_auto_refresh(auto_refresh, refresh_seconds) if realtime else 0
+render_app_header(len(codes), days, realtime, auto_refresh, refresh_seconds)
 
 page_options = ["自选股扫描", "个股分析", "资金财务新闻", "简单回测", "板块轮动", "每日操作清单", "多智能体研判", "优质股票发现", "规则说明"]
 current_page = st.radio("功能导航", page_options, index=0, horizontal=True, label_visibility="collapsed")
 
 if current_page == "自选股扫描":
     st.subheader("自选股扫描")
-    st.caption("当前为快速扫描模式，只拉行情和技术指标；ROE、资金流、新闻公告请进入“个股分析”或“资金财务新闻”查看。")
+    render_section_note("当前为快速扫描模式，只拉行情和技术指标；ROE、资金流、新闻公告请进入“个股分析”或“资金财务新闻”查看。")
     results = scan_watchlist(codes, days, holdings, realtime, refresh_key, code_labels)
     brief = build_market_brief(results)
     cols = st.columns(4)
@@ -575,7 +842,7 @@ if current_page == "自选股扫描":
     cols[2].metric("持有/观察", brief["watch_count"])
     cols[3].metric("减仓/回避", brief["risk_count"], f"均分 {brief['avg_score']:.1f}")
 
-    st.dataframe(make_summary_table(results), use_container_width=True, hide_index=True)
+    st.dataframe(make_summary_table(results), use_container_width=True, hide_index=True, height=270)
     st.markdown("#### 重点卡片")
     card_cols = st.columns(3)
     for idx, item in enumerate(results[:6]):
