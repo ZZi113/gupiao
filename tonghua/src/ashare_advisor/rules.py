@@ -50,6 +50,19 @@ def _last_float(row: pd.Series, key: str, default: float = 0.0) -> float:
     return float(value)
 
 
+def _period_return(df: pd.DataFrame, last: pd.Series, key: str, days: int) -> float:
+    value = last.get(key)
+    if value is not None and not pd.isna(value):
+        return float(value)
+    if len(df) <= days:
+        return 0.0
+    current = float(last.get("close", 0) or 0)
+    previous = float(df["close"].iloc[-days - 1] or 0)
+    if previous <= 0:
+        return 0.0
+    return current / previous - 1
+
+
 def _fmt_pct(value: float | None) -> str:
     if value is None or pd.isna(value):
         return "未知"
@@ -94,9 +107,10 @@ def analyze_stock(code: str, frame: pd.DataFrame, profile: dict, holding: dict |
     rsi = _last_float(last, "rsi14", 50)
     macd_hist = _last_float(last, "macd_hist", 0)
     volume_ratio = _last_float(last, "volume_ratio", 1)
-    ret5 = _last_float(last, "ret_5", 0)
-    ret20 = _last_float(last, "ret_20", 0)
-    ret60 = _last_float(last, "ret_60", 0)
+    ret5 = _period_return(df, last, "ret_5", 5)
+    ret10 = _period_return(df, last, "ret_10", 10)
+    ret20 = _period_return(df, last, "ret_20", 20)
+    ret60 = _period_return(df, last, "ret_60", 60)
     vol20 = _last_float(last, "volatility_20", 0.25)
     support = _last_float(last, "support_60", float(df["low"].tail(60).min()))
     resistance = _last_float(last, "resistance_60", float(df["high"].tail(60).max()))
@@ -230,7 +244,7 @@ def analyze_stock(code: str, frame: pd.DataFrame, profile: dict, holding: dict |
     summary = _make_summary(action, close, score, reasons, risks, pnl)
     operation_plan = _make_operation_plan(action, conservative_entry, breakout_entry, stop_loss, take_profit_watch)
 
-    metrics = _build_metrics(profile, close, ma20, ma60, rsi, volume_ratio, ret20, ret60, vol20, pnl)
+    metrics = _build_metrics(profile, close, ma20, ma60, rsi, volume_ratio, ret5, ret10, ret20, ret60, vol20, pnl)
     fund_summary = _fund_summary(profile.get("fund_flow"))
 
     return {
@@ -362,7 +376,7 @@ def _fund_summary(fund: pd.DataFrame | None) -> dict:
     }
 
 
-def _build_metrics(profile, close, ma20, ma60, rsi, volume_ratio, ret20, ret60, vol20, pnl):
+def _build_metrics(profile, close, ma20, ma60, rsi, volume_ratio, ret5, ret10, ret20, ret60, vol20, pnl):
     financial = profile.get("financial") or {}
     realtime = profile.get("realtime") or {}
     fund = _fund_summary(profile.get("fund_flow"))
@@ -373,6 +387,8 @@ def _build_metrics(profile, close, ma20, ma60, rsi, volume_ratio, ret20, ret60, 
         "MA60": round(ma60, 2),
         "RSI14": round(rsi, 1),
         "量比": round(volume_ratio, 2),
+        "5日涨跌幅": _fmt_pct(ret5),
+        "10日涨跌幅": _fmt_pct(ret10),
         "20日涨跌幅": _fmt_pct(ret20),
         "60日涨跌幅": _fmt_pct(ret60),
         "20日年化波动": _fmt_pct(vol20),

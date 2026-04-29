@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import time
 from datetime import datetime
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -31,6 +32,9 @@ MODE_DESCRIPTIONS = {
     "breakout": "偏向趋势刚走强或准备突破的股票，后续要看突破买点和止损位。",
     "oversold_rebound": "寻找阶段跌幅较大但仍有流动性的修复候选，风险相对更高。",
 }
+
+MARKET_SNAPSHOT_CACHE = Path("logs") / "market_snapshot.csv"
+MARKET_SNAPSHOT_CACHE_TTL = 60 * 10
 
 
 def _num(value, default=np.nan):
@@ -76,7 +80,7 @@ def _fmt_money(value: float | None) -> str:
     return f"{value:.0f}"
 
 
-def _request_json(url: str, params: dict, timeout: int = 14) -> dict:
+def _request_json(url: str, params: dict, timeout: int = 3) -> dict:
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/122.0 Safari/537.36",
@@ -93,6 +97,37 @@ def _request_json(url: str, params: dict, timeout: int = 14) -> dict:
         except Exception as exc:
             last_error = exc
     raise last_error or RuntimeError("request failed")
+
+
+def clear_market_snapshot_file_cache() -> None:
+    try:
+        MARKET_SNAPSHOT_CACHE.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+def _load_market_snapshot_file_cache() -> tuple[pd.DataFrame, str] | None:
+    try:
+        if not MARKET_SNAPSHOT_CACHE.exists():
+            return None
+        age = time.time() - MARKET_SNAPSHOT_CACHE.stat().st_mtime
+        if age > MARKET_SNAPSHOT_CACHE_TTL:
+            return None
+        df = pd.read_csv(MARKET_SNAPSHOT_CACHE, dtype={"代码": str})
+        if df.empty:
+            return None
+        cached_at = datetime.fromtimestamp(MARKET_SNAPSHOT_CACHE.stat().st_mtime).strftime("%H:%M:%S")
+        return df, f"本地缓存全A快照 {cached_at}"
+    except Exception:
+        return None
+
+
+def _save_market_snapshot_file_cache(df: pd.DataFrame) -> None:
+    try:
+        MARKET_SNAPSHOT_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(MARKET_SNAPSHOT_CACHE, index=False, encoding="utf-8-sig")
+    except Exception:
+        pass
 
 
 def _load_spot_eastmoney_direct() -> pd.DataFrame:
@@ -225,12 +260,20 @@ def _sample_snapshot() -> pd.DataFrame:
 
 
 def load_market_snapshot() -> tuple[pd.DataFrame, str, list[str]]:
+    cached = _load_market_snapshot_file_cache()
+    if cached is not None:
+        df, source = cached
+        return df, source, []
+
     warnings: list[str] = []
+    eastmoney_error_type = ""
     try:
         df = _load_spot_eastmoney_direct()
         if isinstance(df, pd.DataFrame) and not df.empty:
+            _save_market_snapshot_file_cache(df)
             return df.copy(), f"东方财富全A快照直连 {datetime.now():%H:%M:%S}", warnings
     except Exception as exc:
+        eastmoney_error_type = type(exc).__name__
         warnings.append(f"东方财富全A直连不可用：{type(exc).__name__}")
 
     provider = DataProvider()
@@ -238,15 +281,20 @@ def load_market_snapshot() -> tuple[pd.DataFrame, str, list[str]]:
         warnings.append("未安装 AKShare，已跳过 AKShare 备用全市场快照。")
         return _sample_snapshot(), "演示全市场快照", warnings
 
-    try:
-        df = provider.ak.stock_zh_a_spot_em()
-        if isinstance(df, pd.DataFrame) and not df.empty:
-            return df.copy(), f"AKShare东方财富全A快照 {datetime.now():%H:%M:%S}", warnings
-    except Exception as exc:
-        warnings.append(f"AKShare全市场快照不可用：{type(exc).__name__}")
+    if eastmoney_error_type not in {"ConnectionError", "ProxyError", "ConnectTimeout", "ReadTimeout", "Timeout"}:
+        try:
+            df = provider.ak.stock_zh_a_spot_em()
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                _save_market_snapshot_file_cache(df)
+                return df.copy(), f"AKShare东方财富全A快照 {datetime.now():%H:%M:%S}", warnings
+        except Exception as exc:
+            warnings.append(f"AKShare全市场快照不可用：{type(exc).__name__}")
+    else:
+        warnings.append("已跳过 AKShare 东方财富备用源，避免重复等待同一个不可用接口。")
     try:
         df = provider.ak.stock_zh_a_spot()
         if isinstance(df, pd.DataFrame) and not df.empty:
+            _save_market_snapshot_file_cache(df)
             return df.copy(), f"AKShare新浪全A快照 {datetime.now():%H:%M:%S}", warnings
     except Exception as exc:
         warnings.append(f"AKShare新浪全A快照不可用：{type(exc).__name__}")

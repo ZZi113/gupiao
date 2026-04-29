@@ -18,9 +18,15 @@ except Exception:
 from src.ashare_advisor.agents import build_agent_markdown, build_agent_review
 from src.ashare_advisor.backtest import run_ma_backtest
 from src.ashare_advisor.data import DataProvider, normalize_codes
-from src.ashare_advisor.reporting import build_rule_report, generate_llm_report
+from src.ashare_advisor.reporting import build_rule_report
 from src.ashare_advisor.rules import analyze_stock, build_market_brief
-from src.ashare_advisor.screener import MODE_DESCRIPTIONS, MODE_LABELS, load_market_snapshot, screen_market_candidates
+from src.ashare_advisor.screener import (
+    MODE_DESCRIPTIONS,
+    MODE_LABELS,
+    clear_market_snapshot_file_cache,
+    load_market_snapshot,
+    screen_market_candidates,
+)
 
 
 st.set_page_config(
@@ -90,10 +96,16 @@ def require_login() -> None:
 require_login()
 
 
-@st.cache_data(show_spinner=False, ttl=60)
-def load_stock(code: str, days: int, realtime: bool, refresh_key: int = 0) -> tuple[pd.DataFrame, dict, str]:
+@st.cache_data(show_spinner=False, ttl=60 * 5)
+def load_stock(
+    code: str,
+    days: int,
+    realtime: bool,
+    refresh_key: int = 0,
+    detail_level: str = "full",
+) -> tuple[pd.DataFrame, dict, str]:
     provider = DataProvider()
-    return provider.load_stock(code, days=days, realtime=realtime)
+    return provider.load_stock(code, days=days, realtime=realtime, detail_level=detail_level)
 
 
 @st.cache_data(show_spinner=False, ttl=60 * 60)
@@ -108,7 +120,7 @@ def load_code_labels(codes: tuple[str, ...]) -> dict[str, str]:
     return provider.load_code_name_map(codes)
 
 
-@st.cache_data(show_spinner=False, ttl=60)
+@st.cache_data(show_spinner=False, ttl=60 * 10)
 def load_market_snapshot_cached(refresh_key: int = 0) -> tuple[pd.DataFrame, str, list[str]]:
     return load_market_snapshot()
 
@@ -302,12 +314,22 @@ def holding_map_from_table(holdings: pd.DataFrame) -> dict:
     return rows
 
 
-def scan_watchlist(codes: list[str], days: int, holdings: pd.DataFrame, realtime: bool, refresh_key: int = 0) -> list[dict]:
+def scan_watchlist(
+    codes: list[str],
+    days: int,
+    holdings: pd.DataFrame,
+    realtime: bool,
+    refresh_key: int = 0,
+    labels: dict[str, str] | None = None,
+) -> list[dict]:
     results = []
+    labels = labels or {}
     holding_map = holding_map_from_table(holdings)
     progress = st.progress(0, text="正在扫描自选股...")
     for idx, code in enumerate(codes):
-        df, profile, source = load_stock(code, days, realtime, refresh_key)
+        df, profile, source = load_stock(code, days, realtime, refresh_key, "scan")
+        if labels.get(code):
+            profile["name"] = labels[code]
         result = analyze_stock(code, df, profile, holding=holding_map.get(code))
         result["source"] = source
         results.append(result)
@@ -333,12 +355,11 @@ def make_summary_table(results: list[dict]) -> pd.DataFrame:
                 "稳健买点": round(levels["conservative_entry"], 2),
                 "突破买点": round(levels["breakout_entry"], 2),
                 "止损位": round(levels["stop_loss"], 2),
-                "ROE": metrics.get("ROE"),
-                "净利润增长": metrics.get("净利润增长"),
-                "5日主力": metrics.get("5日主力净流入"),
-                "更新时间": metrics.get("实时更新时间"),
+                "5日涨跌幅": metrics.get("5日涨跌幅"),
+                "10日涨跌幅": metrics.get("10日涨跌幅"),
+                "20日涨跌幅": metrics.get("20日涨跌幅"),
+                "RSI14": metrics.get("RSI14"),
                 "核心原因": "；".join(item["reasons"][:2]),
-                "数据源": item.get("source", ""),
             }
         )
     return pd.DataFrame(rows)
@@ -431,6 +452,56 @@ def _opportunity_adjust(action: str) -> int:
     }.get(action, 0)
 
 
+def build_quality_reviews(
+    candidates: pd.DataFrame | list[dict],
+    deep_review_count: int,
+    days: int,
+    realtime: bool,
+    refresh_key: int,
+) -> list[dict]:
+    records = candidates.to_dict("records") if isinstance(candidates, pd.DataFrame) else list(candidates)
+    review_records = records[:deep_review_count]
+    rows: list[dict] = []
+    progress = st.progress(0, text="正在复核候选股...")
+    for idx, candidate in enumerate(review_records):
+        code = str(candidate["代码"])
+        df, profile, source = load_stock(code, min(days, 260), realtime, refresh_key, "analysis")
+        result = analyze_stock(code, df, profile)
+        result["source"] = source
+        review = build_agent_review(result)
+        quick_score = float(candidate.get("初筛分", 50))
+        opportunity_score = max(
+            0,
+            min(100, result["score"] * 0.62 + quick_score * 0.38 + _opportunity_adjust(result.get("action", ""))),
+        )
+        levels = result["levels"]
+        rows.append(
+            {
+                "代码": code,
+                "名称": result["name"],
+                "行业": result.get("industry", "未知"),
+                "机会分": round(opportunity_score, 1),
+                "初筛分": round(quick_score, 1),
+                "五档评级": review["rating"],
+                "操作": result["action_label"],
+                "风险": result["risk_level"],
+                "现价": round(result["last_close"], 2),
+                "稳健买点": round(levels["conservative_entry"], 2),
+                "突破买点": round(levels["breakout_entry"], 2),
+                "止损位": round(levels["stop_loss"], 2),
+                "PE": _fmt_optional(candidate.get("市盈率-动态"), 1),
+                "PB": _fmt_optional(candidate.get("市净率"), 1),
+                "成交额": _fmt_money(candidate.get("成交额")),
+                "60日涨跌幅": _fmt_optional(candidate.get("60日涨跌幅"), 1) + "%",
+                "核心理由": "；".join((result["reasons"][:2] + [str(candidate.get("初筛理由", ""))])[:3]),
+                "raw": result,
+            }
+        )
+        progress.progress((idx + 1) / max(len(review_records), 1), text=f"已复核 {idx + 1}/{len(review_records)}")
+    progress.empty()
+    return sorted(rows, key=lambda item: item["机会分"], reverse=True)
+
+
 st.title("A股个人投资操作助手")
 st.caption("实时行情、资金流、财务、新闻公告和简单回测组合判断。仅供研究，不构成投资建议。")
 
@@ -460,12 +531,14 @@ with st.sidebar:
             st.session_state["code_text"] = get_config_value("APP_DEFAULT_CODES") or "600519, 000001, 300750"
             st.rerun()
     days = st.slider("分析周期", min_value=90, max_value=720, value=260, step=10)
-    realtime = st.toggle("启用分钟线实时刷新", value=True)
+    realtime = st.toggle("启用分钟线实时刷新", value=False, help="默认关闭会更快；盯盘时再打开，可把当天分钟线合入分析。")
     auto_refresh = st.toggle("自动刷新行情", value=False)
     refresh_seconds = 60
     if auto_refresh:
         refresh_seconds = st.selectbox("刷新间隔", [30, 60, 120, 300], index=1, format_func=lambda x: f"{x} 秒")
     if st.button("清空缓存并重新取数"):
+        st.session_state["market_refresh_key"] = int(st.session_state.get("market_refresh_key", 0)) + 1
+        clear_market_snapshot_file_cache()
         st.cache_data.clear()
         st.rerun()
 
@@ -481,20 +554,6 @@ with st.sidebar:
         },
     )
 
-    st.subheader("大模型，可选")
-    use_llm = st.toggle("生成大模型报告", value=False)
-    default_llm_base_url = get_config_value("LLM_BASE_URL")
-    default_llm_model = get_config_value("LLM_MODEL", "gpt-4o-mini")
-    default_llm_api_key = get_config_value("LLM_API_KEY")
-    llm_base_url = st.text_input("OpenAI兼容接口地址", value=default_llm_base_url, placeholder="例如 https://api.openai.com/v1")
-    llm_model = st.text_input("模型名", value=default_llm_model)
-    llm_api_key = st.text_input(
-        "API Key",
-        value="",
-        type="password",
-        placeholder="留空则使用云端密钥" if default_llm_api_key else "",
-    )
-
 codes = normalize_codes(code_text)
 if not codes:
     st.warning("请至少输入一个 6 位 A 股代码。")
@@ -502,11 +561,13 @@ if not codes:
 code_labels = load_code_labels(tuple(codes))
 refresh_key = setup_auto_refresh(auto_refresh, refresh_seconds) if realtime else 0
 
-tabs = st.tabs(["自选股扫描", "个股分析", "资金财务新闻", "简单回测", "板块轮动", "每日操作清单", "多智能体研判", "优质股票发现", "规则说明"])
+page_options = ["自选股扫描", "个股分析", "资金财务新闻", "简单回测", "板块轮动", "每日操作清单", "多智能体研判", "优质股票发现", "规则说明"]
+current_page = st.radio("功能导航", page_options, index=0, horizontal=True, label_visibility="collapsed")
 
-with tabs[0]:
+if current_page == "自选股扫描":
     st.subheader("自选股扫描")
-    results = scan_watchlist(codes, days, holdings, realtime, refresh_key)
+    st.caption("当前为快速扫描模式，只拉行情和技术指标；ROE、资金流、新闻公告请进入“个股分析”或“资金财务新闻”查看。")
+    results = scan_watchlist(codes, days, holdings, realtime, refresh_key, code_labels)
     brief = build_market_brief(results)
     cols = st.columns(4)
     cols[0].metric("扫描数量", len(results))
@@ -522,11 +583,11 @@ with tabs[0]:
             render_action_card(item, compact=True)
             st.write("；".join(item["reasons"][:3]))
 
-with tabs[1]:
+elif current_page == "个股分析":
     st.subheader("个股分析")
     selected_code = st.selectbox("选择股票", codes, format_func=lambda x: format_stock_option(x, code_labels))
     holding = holding_map_from_table(holdings).get(selected_code)
-    df, profile, source = load_stock(selected_code, days, realtime, refresh_key)
+    df, profile, source = load_stock(selected_code, days, realtime, refresh_key, "analysis")
     result = analyze_stock(selected_code, df, profile, holding=holding)
     result["source"] = source
 
@@ -564,18 +625,10 @@ with tabs[1]:
         st.dataframe(pd.DataFrame(result["metrics"].items(), columns=["指标", "数值"]), hide_index=True, use_container_width=True)
 
     st.markdown("#### 操作报告")
-    if use_llm:
-        report = generate_llm_report(
-            result,
-            api_key=llm_api_key or default_llm_api_key,
-            base_url=llm_base_url or default_llm_base_url,
-            model=llm_model or default_llm_model,
-        )
-    else:
-        report = build_rule_report(result)
+    report = build_rule_report(result)
     st.markdown(report)
 
-with tabs[2]:
+elif current_page == "资金财务新闻":
     st.subheader("资金、财务、新闻公告")
     selected_code = st.selectbox("选择股票查看明细", codes, key="detail_code", format_func=lambda x: format_stock_option(x, code_labels))
     df, profile, source = load_stock(selected_code, days, realtime, refresh_key)
@@ -594,10 +647,10 @@ with tabs[2]:
     render_news_table(profile.get("news"), "新闻")
     render_news_table(profile.get("notices"), "公告")
 
-with tabs[3]:
+elif current_page == "简单回测":
     st.subheader("简单回测")
     selected_code = st.selectbox("选择股票回测", codes, key="bt_code", format_func=lambda x: format_stock_option(x, code_labels))
-    df, profile, source = load_stock(selected_code, days, False, 0)
+    df, profile, source = load_stock(selected_code, days, False, 0, "history")
     bt = run_ma_backtest(df)
     summary = bt["summary"]
     metric_cols = st.columns(6)
@@ -614,7 +667,7 @@ with tabs[3]:
         st.dataframe(bt["trades"], use_container_width=True, hide_index=True)
     st.caption("回测规则：站上20/60日均线且MACD为正时买入；跌破20日线、止损或过热止盈时卖出。")
 
-with tabs[4]:
+elif current_page == "板块轮动":
     st.subheader("板块轮动")
     boards, board_source = load_boards()
     st.caption(f"数据源：{board_source}")
@@ -624,7 +677,7 @@ with tabs[4]:
         st.dataframe(boards.head(100), use_container_width=True, hide_index=True)
 
     st.markdown("#### 自选股行业分布")
-    results = scan_watchlist(codes, days, holdings, realtime, refresh_key)
+    results = scan_watchlist(codes, days, holdings, realtime, refresh_key, code_labels)
     industry_table = (
         pd.DataFrame({"行业": [x.get("industry", "未知") for x in results], "分数": [x["score"] for x in results]})
         .groupby("行业", as_index=False)
@@ -633,9 +686,9 @@ with tabs[4]:
     )
     st.dataframe(industry_table, use_container_width=True, hide_index=True)
 
-with tabs[5]:
+elif current_page == "每日操作清单":
     st.subheader(f"每日操作清单 - {date.today().isoformat()}")
-    results = scan_watchlist(codes, days, holdings, realtime, refresh_key)
+    results = scan_watchlist(codes, days, holdings, realtime, refresh_key, code_labels)
     groups = {
         "可以买入/小仓试探": [x for x in results if x["action"] in {"buy", "trial_buy"}],
         "可以持有/继续观察": [x for x in results if x["action"] in {"hold", "watch"}],
@@ -651,7 +704,7 @@ with tabs[5]:
             st.write(item["summary"])
             st.caption("；".join(item["reasons"][:3]))
 
-with tabs[6]:
+elif current_page == "多智能体研判":
     st.subheader("多智能体研判")
     selected_code = st.selectbox("选择股票进行研判", codes, key="agent_code", format_func=lambda x: format_stock_option(x, code_labels))
     df, profile, source = load_stock(selected_code, days, realtime, refresh_key)
@@ -712,43 +765,60 @@ with tabs[6]:
         use_container_width=True,
     )
 
-with tabs[7]:
+elif current_page == "优质股票发现":
     st.subheader("优质股票发现")
     st.caption("先用全市场快照粗筛，再对前排候选做技术、资金、财务、新闻和风险复核。仅用于缩小研究范围，不构成买卖建议。")
 
-    control_cols = st.columns([1, 1, 1, 1])
-    with control_cols[0]:
-        discover_mode = st.selectbox(
-            "筛选风格",
-            list(MODE_LABELS.keys()),
+    with st.form("quality_discovery_form"):
+        control_cols = st.columns([1, 1, 1, 1])
+        with control_cols[0]:
+            discover_mode = st.selectbox(
+                "筛选风格",
+                list(MODE_LABELS.keys()),
+                index=0,
+                format_func=lambda x: MODE_LABELS[x],
+                help="可以按不同研究方向切换，不是固定只找一种股票。",
+            )
+        with control_cols[1]:
+            universe_limit = st.slider("初筛候选数", min_value=20, max_value=120, value=60, step=10)
+        with control_cols[2]:
+            deep_review_count = st.slider(
+                "深度复核数",
+                min_value=3,
+                max_value=15,
+                value=5,
+                step=1,
+                help="深度复核会逐只拉K线、资金、财务和新闻，数量越大越慢。",
+            )
+        with control_cols[3]:
+            show_count = st.slider("展示数量", min_value=5, max_value=20, value=10, step=1)
+
+        scan_mode = st.radio(
+            "扫描方式",
+            ["快速初筛", "深度复核"],
             index=0,
-            format_func=lambda x: MODE_LABELS[x],
-            help="可以按不同研究方向切换，不是固定只找一种股票。",
-        )
-    with control_cols[1]:
-        universe_limit = st.slider("初筛候选数", min_value=20, max_value=120, value=60, step=10)
-    with control_cols[2]:
-        deep_review_count = st.slider("深度复核数", min_value=5, max_value=30, value=12, step=1)
-    with control_cols[3]:
-        show_count = st.slider("展示数量", min_value=5, max_value=20, value=10, step=1)
-
-    st.info(f"{MODE_LABELS[discover_mode]}：{MODE_DESCRIPTIONS[discover_mode]}")
-    with st.expander("我是怎么筛选这些候选股的", expanded=False):
-        st.markdown(
-            """
-            这不是直接“预测哪只一定涨”，而是先把全市场缩小成值得研究的候选池：
-
-            1. 数据源优先级：东方财富全A实时快照直连，其次 AKShare 东方财富全市场快照，再用 AKShare 新浪全A实时快照；如果都失败，才会退到演示候选池。
-            2. 基础排除：先排除 ST、退市、新股标记、成交过低、极端估值、涨跌停附近和换手异常的股票。
-            3. 初筛打分：综合估值 PE/PB、流动性、60日趋势、当日强度、换手/量比/振幅、主力净流入和短期风险。
-            4. 风格权重：稳健优质更均衡，趋势增强更看动量，低估修复更看估值，资金关注更看成交和资金，突破/超跌用于找特定形态。
-            5. 深度复核：只对初筛前排做现有个股分析，再用技术面、资金面、基本面、新闻公告和风险经理多角色复核。
-            """
+            horizontal=True,
+            help="快速初筛只做全市场快照打分；深度复核会逐只补充K线、资金、财务和新闻，结果更细但更慢。",
         )
 
-    run_discovery = st.button("开始扫描优质候选", type="primary", use_container_width=True)
+        st.info(f"{MODE_LABELS[discover_mode]}：{MODE_DESCRIPTIONS[discover_mode]}")
+        with st.expander("我是怎么筛选这些候选股的", expanded=False):
+            st.markdown(
+                """
+                这不是直接“预测哪只一定涨”，而是先把全市场缩小成值得研究的候选池：
+
+                1. 数据源优先级：东方财富全A实时快照直连，其次 AKShare 东方财富全市场快照，再用 AKShare 新浪全A实时快照；如果都失败，才会退到演示候选池。
+                2. 基础排除：先排除 ST、退市、新股标记、成交过低、极端估值、涨跌停附近和换手异常的股票。
+                3. 初筛打分：综合估值 PE/PB、流动性、60日趋势、当日强度、换手/量比/振幅、主力净流入和短期风险。
+                4. 风格权重：稳健优质更均衡，趋势增强更看动量，低估修复更看估值，资金关注更看成交和资金，突破/超跌用于找特定形态。
+                5. 深度复核：只对初筛前排做现有个股分析，再用技术面、资金面、基本面、新闻公告和风险经理多角色复核。
+                """
+            )
+
+        run_discovery = st.form_submit_button("开始扫描优质候选", type="primary", use_container_width=True)
     if run_discovery:
-        snapshot, snapshot_source, snapshot_warnings = load_market_snapshot_cached(refresh_key)
+        market_refresh_key = int(st.session_state.get("market_refresh_key", 0))
+        snapshot, snapshot_source, snapshot_warnings = load_market_snapshot_cached(market_refresh_key)
         candidates = screen_market_candidates(snapshot, mode=discover_mode, limit=universe_limit)
         if snapshot_warnings:
             render_data_warnings(snapshot_warnings)
@@ -760,49 +830,51 @@ with tabs[7]:
         if candidates.empty:
             st.warning("当前没有筛出候选股。可以换一个筛选风格，或稍后再重新取数。")
         else:
-            rows: list[dict] = []
-            progress = st.progress(0, text="正在复核候选股...")
-            review_df = candidates.head(deep_review_count)
-            for idx, candidate in review_df.iterrows():
-                code = str(candidate["代码"])
-                df, profile, source = load_stock(code, min(days, 260), realtime, refresh_key)
-                result = analyze_stock(code, df, profile)
-                result["source"] = source
-                review = build_agent_review(result)
-                quick_score = float(candidate.get("初筛分", 50))
-                opportunity_score = max(
-                    0,
-                    min(100, result["score"] * 0.62 + quick_score * 0.38 + _opportunity_adjust(result.get("action", ""))),
-                )
-                levels = result["levels"]
-                rows.append(
-                    {
-                        "代码": code,
-                        "名称": result["name"],
-                        "行业": result.get("industry", "未知"),
-                        "机会分": round(opportunity_score, 1),
-                        "初筛分": round(quick_score, 1),
-                        "五档评级": review["rating"],
-                        "操作": result["action_label"],
-                        "风险": result["risk_level"],
-                        "现价": round(result["last_close"], 2),
-                        "稳健买点": round(levels["conservative_entry"], 2),
-                        "突破买点": round(levels["breakout_entry"], 2),
-                        "止损位": round(levels["stop_loss"], 2),
-                        "PE": _fmt_optional(candidate.get("市盈率-动态"), 1),
-                        "PB": _fmt_optional(candidate.get("市净率"), 1),
-                        "成交额": _fmt_money(candidate.get("成交额")),
-                        "60日涨跌幅": _fmt_optional(candidate.get("60日涨跌幅"), 1) + "%",
-                        "核心理由": "；".join((result["reasons"][:2] + [str(candidate.get("初筛理由", ""))])[:3]),
-                        "raw": result,
-                    }
-                )
-                progress.progress((idx + 1) / max(len(review_df), 1), text=f"已复核 {idx + 1}/{len(review_df)}")
-            progress.empty()
-            rows = sorted(rows, key=lambda item: item["机会分"], reverse=True)[:show_count]
-            st.session_state["quality_candidates"] = rows
+            st.session_state["quality_fast_candidates"] = candidates.head(show_count).to_dict("records")
+            st.session_state["quality_candidates"] = []
+            if scan_mode == "深度复核":
+                rows = build_quality_reviews(candidates, deep_review_count, days, realtime, refresh_key)[:show_count]
+                st.session_state["quality_candidates"] = rows
+            else:
+                st.success("已完成快速初筛。需要更细的买点、风险和多角色观点时，再点击下方“对这些候选做深度复核”。")
 
     quality_rows = st.session_state.get("quality_candidates", [])
+    fast_rows = st.session_state.get("quality_fast_candidates", [])
+    if fast_rows and not quality_rows:
+        st.markdown("#### 快速初筛候选")
+        fast_table = []
+        for rank, row in enumerate(fast_rows, start=1):
+            fast_table.append(
+                {
+                    "排名": rank,
+                    "代码": row.get("代码"),
+                    "名称": row.get("名称"),
+                    "初筛分": row.get("初筛分"),
+                    "现价": _fmt_optional(row.get("最新价"), 2),
+                    "PE": _fmt_optional(row.get("市盈率-动态"), 1),
+                    "PB": _fmt_optional(row.get("市净率"), 1),
+                    "成交额": _fmt_money(row.get("成交额")),
+                    "60日涨跌幅": _fmt_optional(row.get("60日涨跌幅"), 1) + "%",
+                    "初筛理由": row.get("初筛理由", ""),
+                }
+            )
+        st.dataframe(pd.DataFrame(fast_table), use_container_width=True, hide_index=True)
+        fast_cols = st.columns([1, 1, 2])
+        with fast_cols[0]:
+            if st.button("对这些候选做深度复核", use_container_width=True):
+                rows = build_quality_reviews(fast_rows, deep_review_count, days, realtime, refresh_key)[:show_count]
+                st.session_state["quality_candidates"] = rows
+                st.rerun()
+        with fast_cols[1]:
+            if st.button("把初筛候选加入自选股", use_container_width=True):
+                merged_codes = normalize_codes(code_text) + [str(row["代码"]) for row in fast_rows]
+                merged_text = ",".join(dict.fromkeys(merged_codes))
+                st.session_state["code_text"] = merged_text
+                set_query_value("codes", merged_text)
+                st.success("已加入左侧股票池，并写入当前网址。")
+        with fast_cols[2]:
+            st.caption("快速初筛主要用于缩小范围，深度复核才会补充买点、止损、新闻和多角色观点。")
+
     if quality_rows:
         st.markdown("#### 优质候选榜")
         table = make_opportunity_table(quality_rows)
@@ -843,7 +915,7 @@ with tabs[7]:
     else:
         st.info("点击“开始扫描优质候选”，系统会从市场快照里筛出一批更值得进一步研究的股票。")
 
-with tabs[8]:
+elif current_page == "规则说明":
     st.subheader("规则说明")
     st.write(
         """
@@ -858,6 +930,6 @@ with tabs[8]:
         7. 多智能体研判：参考 TradingAgents 的角色拆分方式，把技术面、资金面、基本面、消息面和风险控制分别打分，再由组合经理汇总成五档评级。
         8. 优质股票发现：参考 Qlib/FinRL 的“先筛信号、再做复核”的量化流程，先按流动性、估值、趋势和风险过滤市场，再对前排候选做详细分析。
 
-        大模型报告只负责把结构化数据改写成更自然的操作报告，不负责凭空预测涨跌。
+        操作报告由本地规则生成，不调用外部接口。
         """
     )

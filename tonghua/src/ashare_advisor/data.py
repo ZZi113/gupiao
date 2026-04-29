@@ -14,6 +14,7 @@ from .sample_data import SAMPLE_NAMES, make_sample_profile, make_sample_stock
 
 
 _CODE_NAME_CACHE: pd.DataFrame | None = None
+_CODE_LABEL_CACHE: dict[str, str] = {}
 
 
 def normalize_codes(text_or_codes: str | Iterable[str]) -> list[str]:
@@ -96,7 +97,13 @@ class DataProvider:
             ak = None
         self.ak = ak
 
-    def load_stock(self, code: str, days: int = 260, realtime: bool = True) -> tuple[pd.DataFrame, dict, str]:
+    def load_stock(
+        self,
+        code: str,
+        days: int = 260,
+        realtime: bool = True,
+        detail_level: str = "full",
+    ) -> tuple[pd.DataFrame, dict, str]:
         code = normalize_codes([code])[0]
         profile = make_sample_profile(code)
         profile.update(
@@ -122,11 +129,23 @@ class DataProvider:
 
         source_parts: list[str] = []
         df = self._load_real_history(code, days, profile, source_parts)
-        self._enrich_profile(code, profile)
-        self._enrich_financials(code, profile)
-        self._enrich_fund_flow(code, profile)
-        self._enrich_news(code, profile)
-        self._enrich_notices(code, profile)
+        if detail_level == "scan":
+            if code in SAMPLE_NAMES and (profile.get("name") in {code, f"股票{code}"} or not profile.get("name")):
+                profile["name"], profile["industry"] = SAMPLE_NAMES[code]
+            source_parts.append("轻量扫描")
+        elif detail_level == "history":
+            source_parts.append("历史行情")
+        elif detail_level == "analysis":
+            self._enrich_profile(code, profile)
+            self._enrich_financials(code, profile)
+            self._enrich_fund_flow(code, profile)
+            source_parts.append("快速分析")
+        else:
+            self._enrich_profile(code, profile)
+            self._enrich_financials(code, profile)
+            self._enrich_fund_flow(code, profile)
+            self._enrich_news(code, profile)
+            self._enrich_notices(code, profile)
 
         if realtime:
             minute_bar = self._load_realtime_minute_bar(code, profile)
@@ -320,31 +339,34 @@ class DataProvider:
     def load_code_name_map(self, codes: Iterable[str]) -> dict[str, str]:
         normalized = normalize_codes(codes)
         labels: dict[str, str] = {}
+        labels.update({code: _CODE_LABEL_CACHE[code] for code in normalized if code in _CODE_LABEL_CACHE})
         if self.ak is not None:
-            try:
-                table = self._load_code_name_table()
-                if not table.empty:
-                    code_col, name_col = table.columns[:2]
-                    lookup = {
-                        str(row[code_col]).zfill(6): str(row[name_col])
-                        for _, row in table.iterrows()
-                    }
-                    labels.update({code: lookup[code] for code in normalized if code in lookup})
-            except Exception:
-                pass
             for code in normalized:
                 if code in labels:
                     continue
-                profile = {"name": f"股票{code}", "industry": "未知", "data_warnings": []}
-                self._enrich_profile_from_cninfo(code, profile)
-                name = profile.get("name")
+                name = self._load_single_code_label(code)
                 if name and name not in {code, f"股票{code}"}:
                     labels[code] = str(name)
+                    _CODE_LABEL_CACHE[code] = str(name)
         for code in normalized:
             if code not in labels and code in SAMPLE_NAMES:
                 labels[code] = SAMPLE_NAMES[code][0]
             labels.setdefault(code, code)
         return labels
+
+    def _load_single_code_label(self, code: str) -> str | None:
+        try:
+            info = self.ak.stock_individual_info_em(symbol=code)
+            values = dict(zip(info["item"].astype(str), info["value"]))
+            name = values.get("股票简称")
+            if name:
+                return str(name)
+        except Exception:
+            pass
+        profile = {"name": f"股票{code}", "industry": "未知", "data_warnings": []}
+        self._enrich_profile_from_cninfo(code, profile)
+        name = profile.get("name")
+        return str(name) if name else None
 
     def _enrich_financials(self, code: str, profile: dict) -> None:
         try:

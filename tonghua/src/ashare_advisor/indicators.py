@@ -37,6 +37,7 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     out["vol_ma20"] = out["volume"].rolling(20).mean()
     out["volume_ratio"] = out["volume"] / out["vol_ma20"].replace(0, np.nan)
     out["ret_5"] = out["close"].pct_change(5)
+    out["ret_10"] = out["close"].pct_change(10)
     out["ret_20"] = out["close"].pct_change(20)
     out["ret_60"] = out["close"].pct_change(60)
     out["volatility_20"] = out["close"].pct_change().rolling(20).std() * np.sqrt(252)
