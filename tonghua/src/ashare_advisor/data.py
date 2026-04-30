@@ -155,7 +155,17 @@ class DataProvider:
         if df is None or df.empty:
             raise RuntimeError("真实行情接口不可用，未使用演示行情替代")
 
-        return add_indicators(df.tail(days).reset_index(drop=True)), profile, " + ".join(dict.fromkeys(source_parts))
+        final_df = df.tail(days).reset_index(drop=True)
+        latest_date = pd.to_datetime(final_df["date"], errors="coerce").max() if "date" in final_df else pd.NaT
+        profile["history_rows"] = int(len(final_df))
+        profile["history_latest_date"] = "" if pd.isna(latest_date) else latest_date.strftime("%Y-%m-%d")
+        profile["realtime_requested"] = bool(realtime)
+        if realtime and not profile.get("realtime"):
+            profile["data_notes"].append("已请求分钟线实时数据，但当前接口未返回可合并的当日分钟线")
+        elif not realtime:
+            profile["data_notes"].append("当前使用日线快照；如需盯盘同步，请开启分钟线实时刷新")
+
+        return add_indicators(final_df), profile, " + ".join(dict.fromkeys(source_parts))
 
     def _load_real_history(self, code: str, days: int, profile: dict, source_parts: list[str]) -> pd.DataFrame | None:
         start = (date.today() - timedelta(days=days * 2)).strftime("%Y%m%d")

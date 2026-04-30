@@ -5,6 +5,7 @@ def build_rule_report(result: dict) -> str:
     financial = result.get("financial") or {}
     metrics = result.get("metrics") or {}
     levels = result["levels"]
+    components = result.get("score_components") or {}
     lines = [
         f"## {result['code']} {result['name']} 操作报告",
         "",
@@ -23,8 +24,19 @@ def build_rule_report(result: dict) -> str:
         f"- 止损位：{levels['stop_loss']:.2f}",
         f"- 止盈观察位：{levels['take_profit_watch']:.2f}",
         "",
-        "### 支持理由",
+        "### 分层评分",
     ]
+    for name, item in components.items():
+        weight = f"{float(item.get('weight', 0)) * 100:.0f}%" if item.get("available", True) else "未计入"
+        evidence = "；".join(item.get("evidence") or ["暂无"])
+        concerns = "；".join(item.get("concerns") or ["暂无"])
+        lines.append(f"- {name}：{item.get('score', '未知')}（权重：{weight}）。依据：{evidence}。风险：{concerns}")
+    lines.extend(
+        [
+            "",
+            "### 支持理由",
+        ]
+    )
     lines.extend([f"- {item}" for item in result["reasons"]])
     lines.extend(["", "### 风险提示"])
     lines.extend([f"- {item}" for item in result["risks"]])
@@ -42,4 +54,3 @@ def build_rule_report(result: dict) -> str:
         ]
     )
     return "\n".join(lines)
-

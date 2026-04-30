@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 import time
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import numpy as np
@@ -233,11 +233,12 @@ def _load_spot_eastmoney_direct() -> pd.DataFrame:
     return pd.DataFrame(mapped)
 
 
-def load_market_snapshot() -> tuple[pd.DataFrame, str, list[str]]:
-    cached = _load_market_snapshot_file_cache()
-    if cached is not None:
-        df, source = cached
-        return df, source, []
+def load_market_snapshot(force_refresh: bool = False) -> tuple[pd.DataFrame, str, list[str]]:
+    if not force_refresh:
+        cached = _load_market_snapshot_file_cache()
+        if cached is not None:
+            df, source = cached
+            return df, source, []
 
     warnings: list[str] = []
     eastmoney_error_type = ""
@@ -297,6 +298,34 @@ def _normalise_snapshot(raw: pd.DataFrame) -> pd.DataFrame:
         "市盈率TTM",
         "振幅",
     ]
+
+    aliases = {
+        "代码": ["代码", "code", "symbol"],
+        "名称": ["名称", "name"],
+        "最新价": ["最新价", "现价", "trade", "price", "close"],
+        "涨跌幅": ["涨跌幅", "涨幅", "changepercent", "pct_chg"],
+        "成交额": ["成交额", "amount"],
+        "成交量": ["成交量", "volume"],
+        "换手率": ["换手率", "turnover"],
+        "市盈率-动态": ["市盈率-动态", "市盈率", "pe", "pe_ttm"],
+        "市净率": ["市净率", "pb"],
+        "总市值": ["总市值", "total_mv", "market_cap"],
+        "流通市值": ["流通市值", "circ_mv"],
+        "量比": ["量比", "volume_ratio"],
+        "5分钟涨跌": ["5分钟涨跌"],
+        "60日涨跌幅": ["60日涨跌幅"],
+        "年初至今涨跌幅": ["年初至今涨跌幅"],
+        "主力净流入": ["主力净流入", "main_net_inflow"],
+        "市盈率TTM": ["市盈率TTM", "市盈率-ttm", "pe_ttm"],
+        "振幅": ["振幅", "amplitude"],
+    }
+    for target, candidates in aliases.items():
+        if target in df:
+            continue
+        for candidate in candidates:
+            if candidate in df:
+                df[target] = df[candidate]
+                break
     for col in required:
         if col not in df:
             df[col] = np.nan if col not in {"代码", "名称"} else ""
@@ -315,25 +344,31 @@ def _base_filter(df: pd.DataFrame, mode: str) -> pd.DataFrame:
     pb = out["市净率"]
     turnover = out["换手率"]
     market_cap = out["总市值"]
+    amount = out["成交额"]
+    ret60 = out["60日涨跌幅"]
+    change = out["涨跌幅"]
     has_pe = pe.notna().any()
     has_pb = pb.notna().any()
     has_turnover = turnover.notna().any()
     has_market_cap = market_cap.notna().any()
+    has_amount = amount.notna().any()
+    has_ret60 = ret60.notna().any()
     market_ok = market_cap.fillna(0).ge(2e9) if has_market_cap else pd.Series(True, index=out.index)
     pe_ok = pe.fillna(1).gt(0) if has_pe else pd.Series(True, index=out.index)
     pb_ok = pb.fillna(1).gt(0) if has_pb else pd.Series(True, index=out.index)
     turnover_ok = turnover.fillna(1).between(0.15, 25) if has_turnover else pd.Series(True, index=out.index)
+    amount_ok = amount.fillna(0).ge(3e7) if has_amount else pd.Series(True, index=out.index)
     mask = (
         out["代码"].str.match(r"^[036]\d{5}$")
         & ~name.str.contains("ST|退|退市", regex=True, case=False, na=False)
         & ~name.str.startswith(("N", "C"))
         & out["最新价"].between(2, 5000)
-        & out["成交额"].fillna(0).ge(3e7)
+        & amount_ok
         & market_ok
         & pe_ok
         & pb_ok
         & turnover_ok
-        & out["涨跌幅"].fillna(0).between(-9.5, 9.5)
+        & change.fillna(0).between(-9.5, 9.5)
     )
     if mode == "balanced":
         if has_pe:
@@ -341,7 +376,9 @@ def _base_filter(df: pd.DataFrame, mode: str) -> pd.DataFrame:
         if has_pb:
             mask &= pb.between(0.4, 10) | pb.isna()
     elif mode == "momentum":
-        mask &= out["60日涨跌幅"].fillna(0).between(3, 90) & out["涨跌幅"].fillna(0).between(-3, 7.5)
+        if has_ret60:
+            mask &= ret60.between(3, 90)
+        mask &= change.fillna(0).between(-3, 7.5)
     elif mode == "value":
         if has_pe:
             mask &= pe.between(3, 35)
@@ -357,9 +394,13 @@ def _base_filter(df: pd.DataFrame, mode: str) -> pd.DataFrame:
         if has_turnover:
             mask &= turnover.fillna(1).between(0.8, 18)
     elif mode == "breakout":
-        mask &= out["60日涨跌幅"].fillna(0).between(0, 95) & out["涨跌幅"].fillna(0).between(-2.5, 8.5)
+        if has_ret60:
+            mask &= ret60.between(0, 95)
+        mask &= change.fillna(0).between(-2.5, 8.5)
     elif mode == "oversold_rebound":
-        mask &= out["60日涨跌幅"].fillna(0).between(-45, -3) & out["涨跌幅"].fillna(0).between(-6, 6)
+        if has_ret60:
+            mask &= ret60.between(-45, -3)
+        mask &= change.fillna(0).between(-6, 6)
     return out[mask].copy()
 
 
@@ -370,21 +411,26 @@ def _quick_score(row: pd.Series, mode: str) -> tuple[float, list[str]]:
     market_cap = _num(row.get("总市值"))
     turnover = _num(row.get("换手率"))
     change = _num(row.get("涨跌幅"), 0)
-    ret60 = _num(row.get("60日涨跌幅"), 0)
-    ytd = _num(row.get("年初至今涨跌幅"), 0)
-    ratio = _num(row.get("量比"), 1)
-    amplitude = _num(row.get("振幅"), 0)
-    main_flow = _num(row.get("主力净流入"), 0)
+    ret60 = _num(row.get("60日涨跌幅"))
+    ytd = _num(row.get("年初至今涨跌幅"))
+    ratio = _num(row.get("量比"))
+    amplitude = _num(row.get("振幅"))
+    main_flow = _num(row.get("主力净流入"))
+    amount_for_score = amount if not np.isnan(amount) and amount > 0 else 1.0
+    market_cap_for_score = market_cap if not np.isnan(market_cap) and market_cap > 0 else 1.0
+    ret60_for_score = ret60 if not np.isnan(ret60) else 0.0
+    ratio_for_score = ratio if not np.isnan(ratio) else 1.0
+    amplitude_for_score = amplitude if not np.isnan(amplitude) else 0.0
 
     valuation = 0.55 * _score_between(pe, 8, 35, 3, 80) + 0.45 * _score_between(pb, 0.7, 5.5, 0.2, 12)
-    liquidity = 0.55 * _score_min(math.log10(max(amount, 1)), 7.6, 9.6) + 0.45 * _score_min(
-        math.log10(max(market_cap, 1)), 9.8, 11.6
+    liquidity = 0.55 * _score_min(math.log10(amount_for_score), 7.6, 9.6) + 0.45 * _score_min(
+        math.log10(market_cap_for_score), 9.8, 11.6
     )
-    momentum = 0.65 * _score_between(ret60, 3, 45, -30, 95) + 0.35 * _score_between(change, -1.5, 4.5, -8, 8)
+    momentum = 0.65 * _score_between(ret60_for_score, 3, 45, -30, 95) + 0.35 * _score_between(change, -1.5, 4.5, -8, 8)
     activity = _score_between(turnover, 0.8, 8, 0.1, 20)
-    short_term = 0.55 * _score_between(ratio, 0.8, 2.2, 0.2, 5.5) + 0.45 * _score_between(amplitude, 1.0, 7.5, 0.1, 15)
+    short_term = 0.55 * _score_between(ratio_for_score, 0.8, 2.2, 0.2, 5.5) + 0.45 * _score_between(amplitude_for_score, 1.0, 7.5, 0.1, 15)
     capital = 50.0 if np.isnan(main_flow) else (82.0 if main_flow > 0 else 36.0)
-    risk = 0.5 * _score_between(change, -2.5, 5.5, -9.5, 9.5) + 0.5 * _score_between(ret60, -10, 55, -55, 120)
+    risk = 0.5 * _score_between(change, -2.5, 5.5, -9.5, 9.5) + 0.5 * _score_between(ret60_for_score, -10, 55, -55, 120)
 
     if mode == "momentum":
         score = 0.42 * momentum + 0.20 * liquidity + 0.18 * short_term + 0.12 * valuation + 0.08 * risk
@@ -397,10 +443,15 @@ def _quick_score(row: pd.Series, mode: str) -> tuple[float, list[str]]:
     elif mode == "breakout":
         score = 0.36 * momentum + 0.24 * short_term + 0.18 * liquidity + 0.12 * capital + 0.10 * valuation
     elif mode == "oversold_rebound":
-        rebound = 0.55 * _score_between(ret60, -35, -5, -70, 20) + 0.45 * _score_between(change, -1.5, 4.0, -8, 8)
+        rebound = 0.55 * _score_between(ret60_for_score, -35, -5, -70, 20) + 0.45 * _score_between(change, -1.5, 4.0, -8, 8)
         score = 0.34 * rebound + 0.24 * valuation + 0.20 * liquidity + 0.14 * risk + 0.08 * capital
     else:
         score = 0.26 * valuation + 0.24 * liquidity + 0.22 * momentum + 0.14 * risk + 0.08 * short_term + 0.06 * capital
+
+    key_values = [pe, pb, amount, market_cap, turnover, ret60, ratio, amplitude]
+    field_count = sum(0 if value is None or np.isnan(value) else 1 for value in key_values)
+    if field_count < 6:
+        score -= (6 - field_count) * 3.0
 
     reasons: list[str] = []
     if pe and pe > 0:
@@ -415,19 +466,101 @@ def _quick_score(row: pd.Series, mode: str) -> tuple[float, list[str]]:
         reasons.append(f"年初至今{ytd:.1f}%")
     if main_flow is not None and not np.isnan(main_flow) and main_flow != 0:
         reasons.append(f"主力净流入{_fmt_money(main_flow)}")
+    if field_count < len(key_values):
+        reasons.append(f"字段完整度{field_count}/{len(key_values)}")
+    if np.isnan(ret60):
+        reasons.append("缺少60日涨跌幅，未作硬性趋势判断")
     return float(np.clip(score, 0, 100)), reasons
+
+
+def _score_candidates_frame(df: pd.DataFrame, mode: str, limit: int) -> pd.DataFrame:
+    if df.empty:
+        return df
+    scored = []
+    enhanced_cols = ["市盈率-动态", "市净率", "总市值", "换手率", "60日涨跌幅", "量比", "振幅", "主力净流入"]
+    for _, row in df.iterrows():
+        score, reasons = _quick_score(row, mode)
+        available_enhanced = int(row[enhanced_cols].notna().sum())
+        if available_enhanced < 4:
+            score = min(score, 64.0)
+            reasons = [reason for reason in reasons if not reason.startswith("字段完整度")]
+            reasons.append(f"增强字段{available_enhanced}/{len(enhanced_cols)}，仅作行情初筛")
+        item = row.to_dict()
+        item["初筛分"] = round(score, 1)
+        item["复核状态"] = "行情初筛" if available_enhanced < 4 else "增强初筛"
+        item["可用增强字段"] = f"{available_enhanced}/{len(enhanced_cols)}"
+        item["初筛理由"] = "；".join(reasons[:4])
+        scored.append(item)
+    return pd.DataFrame(scored).sort_values("初筛分", ascending=False).head(limit).reset_index(drop=True)
 
 
 def screen_market_candidates(raw: pd.DataFrame, mode: str = "balanced", limit: int = 60) -> pd.DataFrame:
     df = _normalise_snapshot(raw)
     df = _base_filter(df, mode)
+    return _score_candidates_frame(df, mode, limit)
+
+
+def enrich_candidates_with_history(
+    candidates: pd.DataFrame,
+    mode: str = "balanced",
+    days: int = 260,
+    realtime: bool = True,
+    limit: int = 15,
+) -> tuple[pd.DataFrame, list[str]]:
+    if candidates.empty:
+        return candidates, []
+    provider = DataProvider()
+    enriched = candidates.head(limit).copy()
+    warnings: list[str] = []
+    for index, row in enriched.iterrows():
+        code = str(row.get("代码", ""))
+        if not code:
+            continue
+        try:
+            history, _profile, _source = provider.load_stock(code, days=max(days, 140), realtime=realtime, detail_level="history")
+            metrics = _history_metrics(history)
+            for col, value in metrics.items():
+                if col in enriched.columns and (pd.isna(enriched.at[index, col]) or col in {"60日涨跌幅", "年初至今涨跌幅", "振幅"}):
+                    enriched.at[index, col] = value
+        except Exception as exc:
+            warnings.append(f"{code} 历史行情补全失败：{type(exc).__name__}")
+    filtered = _base_filter(enriched, mode)
+    if filtered.empty:
+        filtered = enriched
+    return _score_candidates_frame(filtered, mode, limit), warnings
+
+
+def _history_metrics(history: pd.DataFrame) -> dict[str, float]:
+    if history.empty or "close" not in history:
+        return {}
+    df = history.copy()
+    df["close"] = pd.to_numeric(df["close"], errors="coerce")
+    df = df.dropna(subset=["close"])
+    if "date" in df:
+        df = df.sort_values("date")
     if df.empty:
-        return df
-    scored = []
-    for _, row in df.iterrows():
-        score, reasons = _quick_score(row, mode)
-        item = row.to_dict()
-        item["初筛分"] = round(score, 1)
-        item["初筛理由"] = "；".join(reasons[:4])
-        scored.append(item)
-    return pd.DataFrame(scored).sort_values("初筛分", ascending=False).head(limit).reset_index(drop=True)
+        return {}
+    latest = float(df["close"].iloc[-1])
+    metrics: dict[str, float] = {}
+    if len(df) >= 61:
+        base = float(df["close"].iloc[-61])
+        if base > 0:
+            metrics["60日涨跌幅"] = (latest / base - 1.0) * 100.0
+    if "date" in df:
+        dates = pd.to_datetime(df["date"], errors="coerce")
+        ytd_rows = df[dates.dt.date >= date(date.today().year, 1, 1)]
+        if not ytd_rows.empty:
+            base = float(ytd_rows["close"].iloc[0])
+            if base > 0:
+                metrics["年初至今涨跌幅"] = (latest / base - 1.0) * 100.0
+    if {"high", "low"}.issubset(df.columns):
+        high = pd.to_numeric(df["high"], errors="coerce").iloc[-1]
+        low = pd.to_numeric(df["low"], errors="coerce").iloc[-1]
+        prev_close = float(df["close"].iloc[-2]) if len(df) >= 2 else latest
+        if pd.notna(high) and pd.notna(low) and prev_close > 0:
+            metrics["振幅"] = (float(high) - float(low)) / prev_close * 100.0
+    if "turnover" in df:
+        turnover = pd.to_numeric(df["turnover"], errors="coerce").iloc[-1]
+        if pd.notna(turnover) and float(turnover) > 0:
+            metrics["换手率"] = float(turnover)
+    return metrics
