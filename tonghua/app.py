@@ -5,6 +5,7 @@ import time
 from datetime import date, datetime
 from html import escape
 from pathlib import Path
+from urllib.parse import quote
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -144,6 +145,176 @@ def inject_theme() -> None:
 
         section[data-testid="stSidebar"] [data-testid="stDataFrame"] {
             border-color: #cfd8e3;
+        }
+
+        section[data-testid="stSidebar"] textarea {
+            background: #ffffff;
+            border: 1px solid #d7dee8;
+            box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+            min-height: 112px !important;
+        }
+
+        section[data-testid="stSidebar"] div[data-testid="stButton"] button {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+        }
+
+        section[data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
+            border-color: #64748b;
+            color: #0f172a;
+        }
+
+        .side-console {
+            background: #ffffff;
+            border: 1px solid #dbe3ef;
+            border-radius: 10px;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+            margin: 0 0 14px;
+            padding: 12px 13px;
+        }
+
+        .side-console-title {
+            color: #0f172a;
+            font-size: 18px;
+            font-weight: 850;
+            margin-bottom: 4px;
+        }
+
+        .side-console-sub {
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .side-panel {
+            background: rgba(255, 255, 255, 0.86);
+            border: 1px solid #dbe3ef;
+            border-radius: 12px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+            margin: 0 0 10px;
+            padding: 10px 11px;
+        }
+
+        .side-panel-head {
+            align-items: center;
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .side-panel-title {
+            color: #0f172a;
+            font-size: 14px;
+            font-weight: 850;
+            letter-spacing: 0;
+        }
+
+        .side-panel-kicker {
+            color: #ef4444;
+            font-size: 10px;
+            font-weight: 850;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .side-panel-copy {
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.55;
+            margin: 0 0 10px;
+        }
+
+        .side-compact-label {
+            color: #475569;
+            font-size: 12px;
+            font-weight: 800;
+            margin: 6px 0 6px;
+        }
+
+        .side-token-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 8px 0 10px;
+            min-height: 28px;
+        }
+
+        .side-token {
+            background: #f8fafc;
+            border: 1px solid #dbe3ef;
+            border-radius: 999px;
+            color: #0f172a;
+            font-size: 12px;
+            font-weight: 750;
+            padding: 5px 8px;
+            transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+        }
+
+        .side-token:hover {
+            border-color: #ef4444;
+            box-shadow: 0 8px 18px rgba(239, 68, 68, 0.12);
+            transform: translateY(-1px);
+        }
+
+        .side-token-muted {
+            color: #64748b;
+            font-weight: 650;
+        }
+
+        .side-metric-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            margin: 8px 0 10px;
+        }
+
+        .side-metric {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px;
+        }
+
+        .side-metric-label {
+            color: #64748b;
+            font-size: 11px;
+            margin-bottom: 3px;
+        }
+
+        .side-metric-value {
+            color: #0f172a;
+            font-size: 16px;
+            font-weight: 850;
+        }
+
+        .side-hint {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 3px solid #2563eb;
+            border-radius: 8px;
+            color: #475569;
+            font-size: 12px;
+            line-height: 1.55;
+            margin: 8px 0 10px;
+            padding: 8px 9px;
+        }
+
+        .side-rule {
+            border-top: 1px solid #dbe3ef;
+            margin: 12px 0 10px;
+        }
+
+        section[data-testid="stSidebar"] div[data-testid="stExpander"] {
+            background: rgba(255, 255, 255, 0.78);
+            border: 1px solid #dbe3ef;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+        }
+
+        section[data-testid="stSidebar"] div[data-testid="stExpander"] summary {
+            color: #0f172a;
+            font-weight: 850;
         }
 
         .app-header {
@@ -359,10 +530,290 @@ def inject_theme() -> None:
             letter-spacing: 0;
         }
 
+        header[data-testid="stHeader"] {
+            background: transparent;
+            height: 0;
+        }
+
+        div[data-testid="stToolbar"],
+        div[data-testid="stDecoration"],
+        div[data-testid="stStatusWidget"],
+        .stDeployButton,
+        #MainMenu,
+        footer {
+            display: none !important;
+            height: 0 !important;
+        }
+
+        .main .block-container {
+            max-width: none !important;
+            padding: 1.25rem 2rem 3rem !important;
+        }
+
+        section[data-testid="stSidebar"] {
+            min-width: 340px !important;
+            width: 340px !important;
+        }
+
+        section[data-testid="stSidebar"] > div {
+            padding-top: 1.2rem;
+            width: 340px !important;
+        }
+
+        .app-header {
+            background: #ffffff;
+            border: 1px solid var(--line);
+            border-top: 3px solid #111827;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+            margin: 0 0 12px;
+            min-height: 92px;
+            overflow: visible;
+            padding: 16px 18px;
+        }
+
+        .app-eyebrow {
+            color: #b91c1c;
+            font-size: 11px;
+            line-height: 1.2;
+            margin-bottom: 8px;
+        }
+
+        .app-header h1 {
+            color: var(--ink);
+            font-size: 26px;
+        }
+
+        .app-header p {
+            color: var(--muted);
+            max-width: 760px;
+        }
+
+        .header-pills {
+            min-width: 0;
+            max-width: 620px;
+        }
+
+        .header-pill {
+            background: #f8fafc;
+            border-color: var(--line);
+            color: #334155;
+        }
+
+        .page-header {
+            margin-top: 14px;
+        }
+
+        .action-card-reasons {
+            border-top: 1px solid #eef2f7;
+            color: #334155;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-top: 10px;
+            padding-top: 9px;
+        }
+
+        .action-card-reasons div {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .scope-panel {
+            display: grid;
+            grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+            gap: 12px;
+            margin: 0 0 16px;
+        }
+
+        .scope-card {
+            background: #ffffff;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 12px 14px;
+            transition: border-color .15s ease, box-shadow .15s ease;
+        }
+
+        .scope-card:hover {
+            border-color: #94a3b8;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+        }
+
+        .scope-title {
+            color: #475569;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            margin-bottom: 9px;
+        }
+
+        .scope-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .scope-chip {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            color: #0f172a;
+            font-size: 13px;
+            font-weight: 650;
+            padding: 6px 8px;
+            transition: background .15s ease, border-color .15s ease, transform .15s ease;
+        }
+
+        .scope-chip:hover {
+            background: #fff1f2;
+            border-color: #ef4444;
+            transform: translateY(-1px);
+        }
+
+        .scope-stat-row {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .scope-stat {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 8px;
+        }
+
+        .scope-stat-label {
+            color: #64748b;
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+
+        .scope-stat-value {
+            color: #0f172a;
+            font-size: 17px;
+            font-weight: 800;
+        }
+
+        .scope-empty {
+            color: #64748b;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .smart-nav {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin: 0 0 16px;
+            position: relative;
+            z-index: 20;
+        }
+
+        .smart-group {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+            min-height: 76px;
+            padding: 13px 14px;
+            position: relative;
+            transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+        }
+
+        .smart-group:hover {
+            border-color: #94a3b8;
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+            transform: translateY(-1px);
+        }
+
+        .smart-group-active {
+            border-color: #ef4444;
+            box-shadow: 0 10px 24px rgba(239, 68, 68, 0.12);
+        }
+
+        .smart-group-label {
+            color: #0f172a;
+            font-size: 16px;
+            font-weight: 850;
+            margin-bottom: 5px;
+        }
+
+        .smart-group-desc {
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+
+        .smart-flyout {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+            left: 10px;
+            opacity: 0;
+            padding: 8px;
+            pointer-events: none;
+            position: absolute;
+            right: 10px;
+            top: calc(100% + 8px);
+            transform: translateY(-4px);
+            transition: opacity .15s ease, transform .15s ease;
+            z-index: 100;
+        }
+
+        .smart-group:hover .smart-flyout {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+
+        .smart-link {
+            border-radius: 8px;
+            color: #0f172a !important;
+            display: block;
+            padding: 9px 10px;
+            text-decoration: none !important;
+        }
+
+        .smart-link:hover {
+            background: #f1f5f9;
+        }
+
+        .smart-link-active {
+            background: #fff1f2;
+            color: #b91c1c !important;
+            font-weight: 800;
+        }
+
+        .smart-link-title {
+            display: block;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .smart-link-desc {
+            color: #64748b;
+            display: block;
+            font-size: 12px;
+            line-height: 1.45;
+            margin-top: 2px;
+        }
+
         @media (max-width: 900px) {
+            .main .block-container {
+                padding: 1rem 1rem 2rem !important;
+            }
+
+            section[data-testid="stSidebar"],
+            section[data-testid="stSidebar"] > div {
+                width: 100% !important;
+                min-width: 0 !important;
+            }
+
             .app-header {
                 align-items: flex-start;
                 flex-direction: column;
+                min-height: 0;
             }
 
             .header-pills {
@@ -372,6 +823,14 @@ def inject_theme() -> None:
 
             .app-header h1 {
                 font-size: 28px;
+            }
+
+            .scope-panel {
+                grid-template-columns: 1fr;
+            }
+
+            .smart-nav {
+                grid-template-columns: 1fr;
             }
         }
         </style>
@@ -403,6 +862,112 @@ def render_app_header(code_count: int, days: int, realtime: bool, auto_refresh: 
     )
 
 
+def render_smart_nav(current_page: str, codes: list[str]) -> None:
+    encoded_codes = quote(",".join(codes))
+    groups = [
+        (
+            "组合工作台",
+            "股票池、行业暴露、每日动作合在一个操作流。",
+            [
+                ("自选股扫描", "快速看买卖信号、风险和关键价位"),
+                ("板块轮动", "市场板块与自选池暴露对照"),
+                ("每日操作清单", "把当天动作整理成待办清单"),
+            ],
+        ),
+        (
+            "个股研究",
+            "从价格结构到资金、财务和回测逐层展开。",
+            [
+                ("个股分析", "单股操作计划、风险线和指标快照"),
+                ("资金财务新闻", "资金流、财务指标、新闻公告"),
+                ("简单回测", "验证均线规则过去是否有效"),
+                ("多智能体研判", "多角度交叉复核单股观点"),
+            ],
+        ),
+        (
+            "发现与规则",
+            "从市场里找候选，再看系统为什么这么判断。",
+            [
+                ("优质股票发现", "全市场粗筛和深度复核"),
+                ("规则说明", "打分、风险和动作规则解释"),
+            ],
+        ),
+    ]
+    cards = []
+    for title, desc, links in groups:
+        group_active = any(page == current_page for page, _ in links)
+        link_html = []
+        for page, link_desc in links:
+            active = " smart-link-active" if page == current_page else ""
+            href = f"?view={quote(page)}&codes={encoded_codes}"
+            link_html.append(
+                f"""
+                <a class="smart-link{active}" href="{href}">
+                    <span class="smart-link-title">{escape(page)}</span>
+                    <span class="smart-link-desc">{escape(link_desc)}</span>
+                </a>
+                """
+            )
+        cards.append(
+            f"""
+            <div class="smart-group{' smart-group-active' if group_active else ''}">
+                <div class="smart-group-label">{escape(title)}</div>
+                <div class="smart-group-desc">{escape(desc)}</div>
+                <div class="smart-flyout">{''.join(link_html)}</div>
+            </div>
+            """
+        )
+    st.markdown(f'<div class="smart-nav">{"".join(cards)}</div>', unsafe_allow_html=True)
+
+
+def render_workflow_nav(current_page: str, codes: list[str]) -> None:
+    groups = [
+        (
+            "组合监控",
+            "适合合并：股票池扫描、行业暴露和每日操作本来就是同一个组合管理流程。",
+            [
+                ("自选股扫描", "先看股票池整体买卖信号和风险分布"),
+                ("板块轮动", "再看市场行业和自选池行业暴露是否匹配"),
+                ("每日操作清单", "最后整理今天要关注、减仓或继续观察的动作"),
+            ],
+        ),
+        (
+            "单股研究",
+            "适合合并：单只股票的技术、资金、财务、新闻和回测需要上下文连着看。",
+            [
+                ("个股分析", "操作计划、关键价位、风险提示"),
+                ("资金财务新闻", "资金流、财务质量、新闻公告"),
+                ("简单回测", "验证当前规则过去是否有效"),
+                ("多智能体研判", "多角度复核单股观点"),
+            ],
+        ),
+        (
+            "候选发现",
+            "保持独立：全市场发现和规则说明是研究入口，不应塞进日常看盘流程。",
+            [
+                ("优质股票发现", "从全市场缩小研究范围"),
+                ("规则说明", "查看系统如何打分和判断风险"),
+            ],
+        ),
+    ]
+    cols = st.columns([1, 1, 1, 1.4])
+    for idx, (title, desc, items) in enumerate(groups):
+        active = any(page == current_page for page, _ in items)
+        with cols[idx]:
+            label = f"{'● ' if active else ''}{title}"
+            with st.popover(label, use_container_width=True):
+                st.caption(desc)
+                for page, help_text in items:
+                    button_type = "primary" if page == current_page else "secondary"
+                    if st.button(page, key=f"workflow_nav_{page}", help=help_text, type=button_type, use_container_width=True):
+                        set_query_value("view", page)
+                        set_query_value("codes", ",".join(codes))
+                        st.rerun()
+                    st.caption(help_text)
+    with cols[3]:
+        st.caption("工作流入口只合并有连续关系的功能；个别研究页仍保持独立，避免把所有内容硬塞到一屏。")
+
+
 def render_page_header(title: str, subtitle: str = "", tag: str = "") -> None:
     subtitle_html = f"<p>{escape(subtitle)}</p>" if subtitle else ""
     tag_html = f'<span class="page-tag">{escape(tag)}</span>' if tag else ""
@@ -424,6 +989,68 @@ def render_section_note(text: str) -> None:
     st.markdown(f'<div class="section-note">{escape(text)}</div>', unsafe_allow_html=True)
 
 
+def render_research_scope(codes: list[str], labels: dict[str, str], holdings: pd.DataFrame) -> None:
+    chips = []
+    for code in codes[:12]:
+        name = labels.get(code, "")
+        label = f"{code} {name}" if name and name != code else code
+        chips.append(f'<span class="scope-chip">{escape(label)}</span>')
+    if len(codes) > 12:
+        chips.append(f'<span class="scope-chip">+{len(codes) - 12}</span>')
+    chip_html = "".join(chips) if chips else '<span class="scope-empty">暂无股票池</span>'
+
+    holding_rows = []
+    if isinstance(holdings, pd.DataFrame) and not holdings.empty:
+        for _, row in holdings.dropna(subset=["code"]).iterrows():
+            normalized = normalize_codes([row.get("code", "")])
+            if normalized:
+                holding_rows.append(
+                    {
+                        "code": normalized[0],
+                        "cost": row.get("cost", 0) or 0,
+                        "weight": row.get("weight", 0) or 0,
+                    }
+                )
+    holding_count = len(holding_rows)
+    total_weight = sum(float(item["weight"] or 0) for item in holding_rows)
+    cost_count = sum(1 for item in holding_rows if float(item["cost"] or 0) > 0)
+    holding_html = (
+        f"""
+        <div class="scope-stat-row">
+            <div class="scope-stat">
+                <div class="scope-stat-label">持仓股票</div>
+                <div class="scope-stat-value">{holding_count}</div>
+            </div>
+            <div class="scope-stat">
+                <div class="scope-stat-label">仓位合计</div>
+                <div class="scope-stat-value">{total_weight:.0f}%</div>
+            </div>
+            <div class="scope-stat">
+                <div class="scope-stat-label">成本记录</div>
+                <div class="scope-stat-value">{cost_count}</div>
+            </div>
+        </div>
+        """
+        if holding_count
+        else '<div class="scope-empty">左侧填写持仓成本和仓位后，这里会同步显示组合暴露。</div>'
+    )
+    st.markdown(
+        f"""
+        <div class="scope-panel">
+            <div class="scope-card">
+                <div class="scope-title">CURRENT STOCK POOL</div>
+                <div class="scope-chips">{chip_html}</div>
+            </div>
+            <div class="scope-card">
+                <div class="scope-title">POSITION SNAPSHOT</div>
+                {holding_html}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 inject_theme()
 
 
@@ -435,7 +1062,9 @@ def load_stock(
     refresh_key: int = 0,
     detail_level: str = "full",
 ) -> tuple[pd.DataFrame, dict, str]:
+    profile_cache_version = "real-data-only-v1"
     provider = DataProvider()
+    _ = profile_cache_version
     return provider.load_stock(code, days=days, realtime=realtime, detail_level=detail_level)
 
 
@@ -456,6 +1085,45 @@ def load_market_snapshot_cached(refresh_key: int = 0) -> tuple[pd.DataFrame, str
     return load_market_snapshot()
 
 
+def fetch_stock_with_progress(
+    code: str,
+    days: int,
+    realtime: bool,
+    refresh_key: int,
+    detail_level: str,
+    label: str,
+) -> tuple[pd.DataFrame, dict, str]:
+    progress = st.progress(0, text=f"准备拉取 {label} 数据...")
+    progress.progress(18, text=f"正在连接数据源：{label}")
+    df, profile, source = load_stock(code, days, realtime, refresh_key, detail_level)
+    progress.progress(78, text=f"正在计算技术指标：{label}")
+    progress.progress(100, text=f"数据已完成：{label}")
+    time.sleep(0.15)
+    progress.empty()
+    return df, profile, source
+
+
+def fetch_boards_with_progress() -> tuple[pd.DataFrame, str]:
+    progress = st.progress(0, text="正在拉取行业板块数据...")
+    progress.progress(45, text="正在连接板块行情接口...")
+    boards, source = load_boards()
+    progress.progress(100, text="板块数据已完成")
+    time.sleep(0.15)
+    progress.empty()
+    return boards, source
+
+
+def fetch_market_snapshot_with_progress(refresh_key: int = 0) -> tuple[pd.DataFrame, str, list[str]]:
+    progress = st.progress(0, text="正在拉取全市场快照...")
+    progress.progress(25, text="正在获取全市场行情与基础指标...")
+    snapshot, source, warnings = load_market_snapshot_cached(refresh_key)
+    progress.progress(75, text=f"已获取 {len(snapshot)} 只股票，正在准备筛选...")
+    progress.progress(100, text="全市场快照已完成")
+    time.sleep(0.15)
+    progress.empty()
+    return snapshot, source, warnings
+
+
 FINANCIAL_FIELDS = [
     ("report_date", "最新财报期", ""),
     ("roe", "净资产收益率ROE", "%"),
@@ -473,6 +1141,13 @@ FINANCIAL_FIELDS = [
 def format_stock_option(code: str, labels: dict[str, str]) -> str:
     name = labels.get(code, "")
     return f"{code} {name}" if name and name != code else code
+
+
+def clean_industry_name(value) -> str:
+    text = "" if value is None else str(value).strip()
+    if text in {"", "未知", "未知行业", "nan", "None"}:
+        return "未获取"
+    return text
 
 
 def format_financial_value(value, suffix: str) -> str:
@@ -639,17 +1314,23 @@ def plot_backtest(equity: pd.DataFrame) -> go.Figure:
 
 def render_action_card(result: dict, compact: bool = False) -> None:
     color = result["color"]
-    industry = result.get("industry", "未知")
+    industry = clean_industry_name(result.get("industry"))
     meta = escape(f"{result['code']} {result['name']} / {industry}")
     action_label = escape(str(result["action_label"]))
     risk_level = escape(str(result["risk_level"]))
     confidence = escape(str(result["confidence"]))
+    reason_html = ""
+    if compact:
+        reasons = [escape(str(item)) for item in result.get("reasons", [])[:2]]
+        if reasons:
+            reason_html = '<div class="action-card-reasons">' + "".join(f"<div>{item}</div>" for item in reasons) + "</div>"
     st.markdown(
         f"""
         <div class="action-card" style="border-left-color: {color};">
             <div class="action-card-meta">{meta}</div>
             <div class="action-card-title" style="color: {color};">{action_label}</div>
             <div class="action-card-score">综合分 {result['score']:.1f} / 风险 {risk_level} / 置信度 {confidence}</div>
+            {reason_html}
         </div>
         """,
         unsafe_allow_html=True,
@@ -678,15 +1359,24 @@ def scan_watchlist(
     results = []
     labels = labels or {}
     holding_map = holding_map_from_table(holdings)
-    progress = st.progress(0, text="正在扫描自选股...")
+    total = max(len(codes), 1)
+    progress = st.progress(0, text=f"准备扫描 {len(codes)} 只自选股...")
     for idx, code in enumerate(codes):
-        df, profile, source = load_stock(code, days, realtime, refresh_key, "scan")
+        display_name = labels.get(code, code)
+        progress.progress(idx / total, text=f"正在拉取 {idx + 1}/{len(codes)}：{code} {display_name}")
+        try:
+            df, profile, source = load_stock(code, days, realtime, refresh_key, "scan")
+        except Exception as exc:
+            st.error(f"{code} 真实数据获取失败：{type(exc).__name__}。已跳过，未使用演示数据。")
+            progress.progress((idx + 1) / total, text=f"已跳过 {idx + 1}/{len(codes)}：{code}")
+            continue
+        progress.progress(min((idx + 0.65) / total, 1.0), text=f"正在计算信号 {idx + 1}/{len(codes)}：{code} {display_name}")
         if labels.get(code):
             profile["name"] = labels[code]
         result = analyze_stock(code, df, profile, holding=holding_map.get(code))
         result["source"] = source
         results.append(result)
-        progress.progress((idx + 1) / max(len(codes), 1), text=f"已完成 {idx + 1}/{len(codes)}")
+        progress.progress((idx + 1) / total, text=f"已完成 {idx + 1}/{len(codes)}：{code} {display_name}")
     progress.empty()
     return sorted(results, key=lambda x: (x["rank"], -x["score"]))
 
@@ -700,11 +1390,12 @@ def make_summary_table(results: list[dict]) -> pd.DataFrame:
             {
                 "代码": item["code"],
                 "名称": item["name"],
-                "行业": item.get("industry", "未知"),
+                "行业": clean_industry_name(item.get("industry")),
                 "操作": item["action_label"],
                 "分数": round(item["score"], 1),
                 "风险": item["risk_level"],
                 "现价": round(item["last_close"], 2),
+                "数据源": item.get("source", ""),
                 "稳健买点": round(levels["conservative_entry"], 2),
                 "突破买点": round(levels["breakout_entry"], 2),
                 "止损位": round(levels["stop_loss"], 2),
@@ -856,7 +1547,6 @@ def build_quality_reviews(
 
 
 with st.sidebar:
-    st.header("股票池")
     if get_config_value("APP_PASSWORD") and st.session_state.get("authenticated"):
         if st.button("退出登录"):
             st.session_state.pop("authenticated", None)
@@ -867,19 +1557,75 @@ with st.sidebar:
         or get_config_value("APP_DEFAULT_CODES")
         or "600519, 000001, 300750, 601318, 000858"
     )
-    code_text = st.text_area("自选股代码", value=default_codes, height=110, key="code_text")
+    default_watchlist_codes = normalize_codes(default_codes)
+    st.markdown(
+        """
+        <div class="side-panel">
+            <div class="side-panel-head">
+                <div>
+                    <div class="side-panel-kicker">WATCHLIST</div>
+                    <div class="side-panel-title">自选股池</div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    stock_pool_seed = pd.DataFrame(
+        [{"代码": code} for code in default_watchlist_codes]
+        or [{"代码": ""}]
+    )
+    stock_pool_table = st.data_editor(
+        stock_pool_seed,
+        num_rows="dynamic",
+        use_container_width=True,
+        hide_index=True,
+        key="watchlist_code_editor_v2",
+        height=112,
+        column_config={
+            "代码": st.column_config.TextColumn("股票代码", width="medium", validate=r"^\d{0,6}$"),
+        },
+    )
+    sidebar_codes = normalize_codes(stock_pool_table["代码"].tolist() if "代码" in stock_pool_table else [])
+    code_text = ",".join(sidebar_codes)
+    sidebar_labels = load_code_labels(tuple(sidebar_codes)) if sidebar_codes else {}
+    synced_pool_table = pd.DataFrame(
+        [{"代码": code, "名称": sidebar_labels.get(code, "未获取")} for code in sidebar_codes]
+        or [{"代码": "", "名称": ""}]
+    )
+    st.dataframe(
+        synced_pool_table,
+        use_container_width=True,
+        hide_index=True,
+        height=min(112, 39 + 35 * max(len(synced_pool_table), 1)),
+    )
     save_col, clear_col = st.columns(2)
     with save_col:
         if st.button("保存股票池", use_container_width=True):
-            saved_codes = ",".join(normalize_codes(st.session_state.get("code_text", "")))
+            saved_codes = ",".join(sidebar_codes)
             if saved_codes:
                 set_query_value("codes", saved_codes)
-                st.success("已保存到当前网址。收藏这个网址，下次打开会自动带上这些股票。")
+                st.success("已保存")
     with clear_col:
         if st.button("清除记忆", use_container_width=True):
             set_query_value("codes", "")
-            st.session_state["code_text"] = get_config_value("APP_DEFAULT_CODES") or "600519, 000001, 300750"
+            st.session_state.pop("watchlist_editor", None)
+            st.session_state.pop("watchlist_code_editor_v2", None)
             st.rerun()
+    st.markdown('<div class="side-rule"></div>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="side-panel">
+            <div class="side-panel-head">
+                <div>
+                    <div class="side-panel-kicker">DATA WINDOW</div>
+                    <div class="side-panel-title">周期和刷新</div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     days = st.slider("分析周期", min_value=90, max_value=720, value=260, step=10)
     realtime = st.toggle("启用分钟线实时刷新", value=False, help="默认关闭会更快；盯盘时再打开，可把当天分钟线合入分析。")
     auto_refresh = st.toggle("自动刷新行情", value=False)
@@ -892,17 +1638,59 @@ with st.sidebar:
         st.cache_data.clear()
         st.rerun()
 
-    st.divider()
-    st.subheader("持仓，可选")
-    holdings = st.data_editor(
-        pd.DataFrame([{"code": "", "cost": 0.0, "weight": 0.0}]),
-        num_rows="dynamic",
-        use_container_width=True,
-        column_config={
-            "code": st.column_config.TextColumn("代码"),
-            "cost": st.column_config.NumberColumn("成本价", min_value=0.0, step=0.01),
-            "weight": st.column_config.NumberColumn("仓位%", min_value=0.0, max_value=100.0, step=1.0),
-        },
+    st.markdown('<div class="side-rule"></div>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="side-panel">
+            <div class="side-panel-head">
+                <div>
+                    <div class="side-panel-kicker">POSITION</div>
+                    <div class="side-panel-title">持仓成本</div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    with st.expander("录入持仓 / 成本 / 仓位", expanded=False):
+        holdings = st.data_editor(
+            pd.DataFrame([{"code": "", "cost": 0.0, "weight": 0.0}]),
+            num_rows="dynamic",
+            use_container_width=True,
+            key="holdings_editor",
+            column_config={
+                "code": st.column_config.TextColumn("代码"),
+                "cost": st.column_config.NumberColumn("成本价", min_value=0.0, step=0.01),
+                "weight": st.column_config.NumberColumn("仓位%", min_value=0.0, max_value=100.0, step=1.0),
+            },
+        )
+    sidebar_holding_rows = []
+    if isinstance(holdings, pd.DataFrame) and not holdings.empty:
+        for _, row in holdings.dropna(subset=["code"]).iterrows():
+            normalized = normalize_codes([row.get("code", "")])
+            if normalized:
+                sidebar_holding_rows.append(
+                    {
+                        "code": normalized[0],
+                        "cost": float(row.get("cost") or 0),
+                        "weight": float(row.get("weight") or 0),
+                    }
+                )
+    total_weight = sum(item["weight"] for item in sidebar_holding_rows)
+    st.markdown(
+        f"""
+        <div class="side-metric-grid">
+            <div class="side-metric">
+                <div class="side-metric-label">持仓记录</div>
+                <div class="side-metric-value">{len(sidebar_holding_rows)}</div>
+            </div>
+            <div class="side-metric">
+                <div class="side-metric-label">仓位合计</div>
+                <div class="side-metric-value">{total_weight:.0f}%</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
 codes = normalize_codes(code_text)
@@ -914,7 +1702,10 @@ refresh_key = setup_auto_refresh(auto_refresh, refresh_seconds) if realtime else
 render_app_header(len(codes), days, realtime, auto_refresh, refresh_seconds)
 
 page_options = ["自选股扫描", "个股分析", "资金财务新闻", "简单回测", "板块轮动", "每日操作清单", "多智能体研判", "优质股票发现", "规则说明"]
-current_page = st.radio("功能导航", page_options, index=0, horizontal=True, label_visibility="collapsed")
+requested_page = get_query_value("view")
+current_page = requested_page if requested_page in page_options else page_options[0]
+render_workflow_nav(current_page, codes)
+render_research_scope(codes, code_labels, holdings)
 
 if current_page == "自选股扫描":
     render_page_header("自选股扫描", "快速检查自选池里的趋势、风险和操作方向。", "WATCHLIST")
@@ -928,19 +1719,27 @@ if current_page == "自选股扫描":
     cols[3].metric("减仓/回避", brief["risk_count"], f"均分 {brief['avg_score']:.1f}")
 
     st.markdown("### 信号明细")
-    st.dataframe(make_summary_table(results), use_container_width=True, hide_index=True, height=270)
+    table_height = min(320, 76 + 36 * max(len(results), 2))
+    st.dataframe(make_summary_table(results), use_container_width=True, hide_index=True, height=table_height)
     st.markdown("### 重点信号")
-    card_cols = st.columns(3)
-    for idx, item in enumerate(results[:6]):
-        with card_cols[idx % 3]:
+    visible_cards = results[:6]
+    card_cols = st.columns(max(1, min(3, len(visible_cards))))
+    for idx, item in enumerate(visible_cards):
+        with card_cols[idx % len(card_cols)]:
             render_action_card(item, compact=True)
-            st.write("；".join(item["reasons"][:3]))
 
 elif current_page == "个股分析":
     render_page_header("个股分析", "查看单只股票的技术结构、交易计划、风险提示和指标快照。", "DETAIL")
     selected_code = st.selectbox("选择股票", codes, format_func=lambda x: format_stock_option(x, code_labels))
     holding = holding_map_from_table(holdings).get(selected_code)
-    df, profile, source = load_stock(selected_code, days, realtime, refresh_key, "analysis")
+    df, profile, source = fetch_stock_with_progress(
+        selected_code,
+        days,
+        realtime,
+        refresh_key,
+        "analysis",
+        format_stock_option(selected_code, code_labels),
+    )
     result = analyze_stock(selected_code, df, profile, holding=holding)
     result["source"] = source
 
@@ -984,7 +1783,14 @@ elif current_page == "个股分析":
 elif current_page == "资金财务新闻":
     render_page_header("资金、财务、新闻公告", "把资金流、财务质量、新闻和公告放在同一屏复核。", "DATA")
     selected_code = st.selectbox("选择股票查看明细", codes, key="detail_code", format_func=lambda x: format_stock_option(x, code_labels))
-    df, profile, source = load_stock(selected_code, days, realtime, refresh_key)
+    df, profile, source = fetch_stock_with_progress(
+        selected_code,
+        days,
+        realtime,
+        refresh_key,
+        "full",
+        format_stock_option(selected_code, code_labels),
+    )
     result = analyze_stock(selected_code, df, profile, holding=holding_map_from_table(holdings).get(selected_code))
     st.caption(f"数据源：{source}")
     render_source_status(profile)
@@ -1003,7 +1809,14 @@ elif current_page == "资金财务新闻":
 elif current_page == "简单回测":
     render_page_header("简单回测", "用固定规则粗略验证均线趋势策略在历史区间里的表现。", "BACKTEST")
     selected_code = st.selectbox("选择股票回测", codes, key="bt_code", format_func=lambda x: format_stock_option(x, code_labels))
-    df, profile, source = load_stock(selected_code, days, False, 0, "history")
+    df, profile, source = fetch_stock_with_progress(
+        selected_code,
+        days,
+        False,
+        0,
+        "history",
+        format_stock_option(selected_code, code_labels),
+    )
     bt = run_ma_backtest(df)
     summary = bt["summary"]
     metric_cols = st.columns(6)
@@ -1022,22 +1835,28 @@ elif current_page == "简单回测":
 
 elif current_page == "板块轮动":
     render_page_header("板块轮动", "观察行业强弱和自选池行业集中度。", "SECTOR")
-    boards, board_source = load_boards()
+    boards, board_source = fetch_boards_with_progress()
     st.caption(f"数据源：{board_source}")
-    if boards.empty:
-        st.warning("板块接口暂时不可用。你仍可以用自选股扫描中的行业列做持仓行业集中度检查。")
-    else:
-        st.dataframe(boards.head(100), use_container_width=True, hide_index=True)
-
-    st.markdown("#### 自选股行业分布")
     results = scan_watchlist(codes, days, holdings, realtime, refresh_key, code_labels)
     industry_table = (
-        pd.DataFrame({"行业": [x.get("industry", "未知") for x in results], "分数": [x["score"] for x in results]})
+        pd.DataFrame({"行业": [clean_industry_name(x.get("industry")) for x in results], "分数": [x["score"] for x in results]})
         .groupby("行业", as_index=False)
         .agg(股票数=("分数", "count"), 平均分=("分数", "mean"))
         .sort_values(["平均分", "股票数"], ascending=False)
     )
-    st.dataframe(industry_table, use_container_width=True, hide_index=True)
+    board_col, pool_col = st.columns([1.45, 1])
+    with board_col:
+        st.markdown("### 市场板块列表")
+        if boards.empty:
+            st.warning("板块接口暂时不可用。你仍可以用右侧自选池行业暴露检查持仓集中度。")
+        else:
+            st.dataframe(boards.head(80), use_container_width=True, hide_index=True, height=420)
+    with pool_col:
+        st.markdown("### 自选池行业暴露")
+        st.dataframe(industry_table, use_container_width=True, hide_index=True, height=210)
+        st.markdown("### 自选池重点信号")
+        for item in results[:4]:
+            render_action_card(item, compact=True)
 
 elif current_page == "每日操作清单":
     render_page_header("每日操作清单", "按买入、观察、减仓回避分组整理当天要看的动作。", date.today().isoformat())
@@ -1060,7 +1879,14 @@ elif current_page == "每日操作清单":
 elif current_page == "多智能体研判":
     render_page_header("多智能体研判", "从技术、资金、基本面、新闻和风控多个角度交叉复核。", "REVIEW")
     selected_code = st.selectbox("选择股票进行研判", codes, key="agent_code", format_func=lambda x: format_stock_option(x, code_labels))
-    df, profile, source = load_stock(selected_code, days, realtime, refresh_key)
+    df, profile, source = fetch_stock_with_progress(
+        selected_code,
+        days,
+        realtime,
+        refresh_key,
+        "full",
+        format_stock_option(selected_code, code_labels),
+    )
     result = analyze_stock(selected_code, df, profile, holding=holding_map_from_table(holdings).get(selected_code))
     result["source"] = source
     review = build_agent_review(result)
@@ -1165,7 +1991,7 @@ elif current_page == "优质股票发现":
                 """
                 这不是直接“预测哪只一定涨”，而是先把全市场缩小成值得研究的候选池：
 
-                1. 数据源优先级：东方财富全A实时快照直连，其次 AKShare 东方财富全市场快照，再用 AKShare 新浪全A实时快照；如果都失败，才会退到演示候选池。
+                1. 数据源优先级：东方财富全A实时快照直连，其次 AKShare 东方财富全市场快照，再用 AKShare 新浪全A实时快照；如果真实数据源都失败，就停止筛选，不使用演示候选池。
                 2. 基础排除：先排除 ST、退市、新股标记、成交过低、极端估值、涨跌停附近和换手异常的股票。
                 3. 初筛打分：综合估值 PE/PB、流动性、60日趋势、当日强度、换手/量比/振幅、主力净流入和短期风险。
                 4. 风格权重：稳健优质更均衡，趋势增强更看动量，低估修复更看估值，资金关注更看成交和资金，突破/超跌用于找特定形态。
@@ -1176,12 +2002,12 @@ elif current_page == "优质股票发现":
         run_discovery = st.form_submit_button("开始扫描优质候选", type="primary", use_container_width=True)
     if run_discovery:
         market_refresh_key = int(st.session_state.get("market_refresh_key", 0))
-        snapshot, snapshot_source, snapshot_warnings = load_market_snapshot_cached(market_refresh_key)
+        snapshot, snapshot_source, snapshot_warnings = fetch_market_snapshot_with_progress(market_refresh_key)
         candidates = screen_market_candidates(snapshot, mode=discover_mode, limit=universe_limit)
         if snapshot_warnings:
             render_data_warnings(snapshot_warnings)
-        if "演示" in snapshot_source:
-            st.error("当前没有连上真实全A市场，只能使用演示候选池。所以候选数量会很少，结果不能当作真实选股结果。请点左侧“清空缓存并重新取数”，或重启应用后再试。")
+        if "不可用" in snapshot_source:
+            st.error("当前没有连上真实全A市场，系统已停止筛选，未使用演示候选池。请点左侧“清空缓存并重新取数”，或稍后重试。")
         elif "新浪" in snapshot_source:
             st.info("当前使用新浪全A备用源，能覆盖真实全市场实时行情，但 PE/PB、60日涨跌幅等字段较少；系统会先用价格和成交额粗筛，再在深度复核时补充个股技术、资金、财务和新闻数据。")
         st.caption(f"候选池数据源：{snapshot_source}；快照股票数 {len(snapshot)}；初筛展示 {len(candidates)} 只")
@@ -1227,9 +2053,10 @@ elif current_page == "优质股票发现":
             if st.button("把初筛候选加入自选股", use_container_width=True):
                 merged_codes = normalize_codes(code_text) + [str(row["代码"]) for row in fast_rows]
                 merged_text = ",".join(dict.fromkeys(merged_codes))
-                st.session_state["code_text"] = merged_text
+                st.session_state.pop("watchlist_code_editor_v2", None)
                 set_query_value("codes", merged_text)
                 st.success("已加入左侧股票池，并写入当前网址。")
+                st.rerun()
         with fast_cols[2]:
             st.caption("快速初筛主要用于缩小范围，深度复核才会补充买点、止损、新闻和多角色观点。")
 
@@ -1243,9 +2070,10 @@ elif current_page == "优质股票发现":
             if st.button("把候选加入自选股", use_container_width=True):
                 merged_codes = normalize_codes(code_text) + [row["代码"] for row in quality_rows]
                 merged_text = ",".join(dict.fromkeys(merged_codes))
-                st.session_state["code_text"] = merged_text
+                st.session_state.pop("watchlist_code_editor_v2", None)
                 set_query_value("codes", merged_text)
                 st.success("已加入左侧股票池，并写入当前网址。")
+                st.rerun()
         with add_cols[1]:
             st.caption("机会分越高，只代表更值得进一步研究；真正买入仍要看你的仓位、风险线和市场环境。")
 

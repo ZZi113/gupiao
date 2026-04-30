@@ -10,7 +10,6 @@ import pandas as pd
 import requests
 
 from .data import DataProvider
-from .sample_data import SAMPLE_NAMES
 
 
 MODE_LABELS = {
@@ -234,31 +233,6 @@ def _load_spot_eastmoney_direct() -> pd.DataFrame:
     return pd.DataFrame(mapped)
 
 
-def _sample_snapshot() -> pd.DataFrame:
-    rows = []
-    for idx, (code, (name, _industry)) in enumerate(SAMPLE_NAMES.items(), start=1):
-        base = 8 + int(code[-2:])
-        rows.append(
-            {
-                "代码": code,
-                "名称": name,
-                "最新价": float(base),
-                "涨跌幅": (idx % 5 - 2) * 1.2,
-                "成交额": (idx + 2) * 1.2e8,
-                "换手率": 1.0 + idx * 0.35,
-                "市盈率-动态": 8 + idx * 5,
-                "市净率": 0.9 + idx * 0.55,
-                "总市值": (idx + 5) * 1.5e10,
-                "流通市值": (idx + 4) * 1.1e10,
-                "量比": 0.8 + idx * 0.12,
-                "5分钟涨跌": (idx % 3 - 1) * 0.4,
-                "60日涨跌幅": (idx % 6 - 2) * 8.0,
-                "年初至今涨跌幅": (idx % 7 - 3) * 6.0,
-            }
-        )
-    return pd.DataFrame(rows)
-
-
 def load_market_snapshot() -> tuple[pd.DataFrame, str, list[str]]:
     cached = _load_market_snapshot_file_cache()
     if cached is not None:
@@ -279,7 +253,7 @@ def load_market_snapshot() -> tuple[pd.DataFrame, str, list[str]]:
     provider = DataProvider()
     if provider.ak is None:
         warnings.append("未安装 AKShare，已跳过 AKShare 备用全市场快照。")
-        return _sample_snapshot(), "演示全市场快照", warnings
+        return pd.DataFrame(), "真实全市场快照不可用", warnings
 
     if eastmoney_error_type not in {"ConnectionError", "ProxyError", "ConnectTimeout", "ReadTimeout", "Timeout"}:
         try:
@@ -298,7 +272,8 @@ def load_market_snapshot() -> tuple[pd.DataFrame, str, list[str]]:
             return df.copy(), f"AKShare新浪全A快照 {datetime.now():%H:%M:%S}", warnings
     except Exception as exc:
         warnings.append(f"AKShare新浪全A快照不可用：{type(exc).__name__}")
-    return _sample_snapshot(), "演示全市场快照", warnings
+    warnings.append("所有真实全市场快照源均不可用，未使用演示候选池。")
+    return pd.DataFrame(), "真实全市场快照不可用", warnings
 
 
 def _normalise_snapshot(raw: pd.DataFrame) -> pd.DataFrame:

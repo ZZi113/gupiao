@@ -10,7 +10,6 @@ import pandas as pd
 import requests
 
 from .indicators import add_indicators
-from .sample_data import SAMPLE_NAMES, make_sample_profile, make_sample_stock
 
 
 _CODE_NAME_CACHE: pd.DataFrame | None = None
@@ -105,34 +104,34 @@ class DataProvider:
         detail_level: str = "full",
     ) -> tuple[pd.DataFrame, dict, str]:
         code = normalize_codes([code])[0]
-        profile = make_sample_profile(code)
-        profile.update(
-            {
-                "code": code,
-                "data_warnings": [],
-                "data_notes": [],
-                "realtime": {},
-                "financial": {},
-                "fund_flow": pd.DataFrame(),
-                "fund_flow_source": "",
-                "news": pd.DataFrame(),
-                "news_source": "",
-                "notices": pd.DataFrame(),
-                "notice_source": "",
-            }
-        )
+        profile = {
+            "code": code,
+            "name": code,
+            "industry": "",
+            "pe": None,
+            "pb": None,
+            "roe": None,
+            "debt_ratio": None,
+            "data_warnings": [],
+            "data_notes": [],
+            "realtime": {},
+            "financial": {},
+            "fund_flow": pd.DataFrame(),
+            "fund_flow_source": "",
+            "news": pd.DataFrame(),
+            "news_source": "",
+            "notices": pd.DataFrame(),
+            "notice_source": "",
+        }
 
         if self.ak is None:
-            df = add_indicators(make_sample_stock(code, days))
-            profile["data_warnings"].append("未安装 AKShare，当前使用演示行情。")
-            return df, profile, "演示数据"
+            raise RuntimeError("未安装 AKShare，无法获取真实行情")
 
         source_parts: list[str] = []
         df = self._load_real_history(code, days, profile, source_parts)
         if detail_level == "scan":
-            if code in SAMPLE_NAMES and (profile.get("name") in {code, f"股票{code}"} or not profile.get("name")):
-                profile["name"], profile["industry"] = SAMPLE_NAMES[code]
-            source_parts.append("轻量扫描")
+            self._enrich_profile(code, profile)
+            source_parts.append("行情 + 个股资料")
         elif detail_level == "history":
             source_parts.append("历史行情")
         elif detail_level == "analysis":
@@ -154,9 +153,7 @@ class DataProvider:
                 source_parts.append("新浪分钟线")
 
         if df is None or df.empty:
-            df = make_sample_stock(code, days)
-            profile["data_warnings"].append("真实行情接口不可用，已临时使用演示行情。")
-            source_parts.append("演示行情")
+            raise RuntimeError("真实行情接口不可用，未使用演示行情替代")
 
         return add_indicators(df.tail(days).reset_index(drop=True)), profile, " + ".join(dict.fromkeys(source_parts))
 
@@ -286,8 +283,6 @@ class DataProvider:
             primary_error = type(exc).__name__
         self._enrich_profile_from_cninfo(code, profile)
         self._enrich_name_from_code_table(code, profile)
-        if code in SAMPLE_NAMES and (profile.get("name") in {code, f"股票{code}"} or not profile.get("name")):
-            profile["name"], profile["industry"] = SAMPLE_NAMES[code]
         unresolved_name = profile.get("name") in {None, "", code, f"股票{code}"}
         unresolved_industry = profile.get("industry") in {None, "", "未知", "未知行业"}
         if primary_error and (unresolved_name or unresolved_industry):
@@ -349,8 +344,6 @@ class DataProvider:
                     labels[code] = str(name)
                     _CODE_LABEL_CACHE[code] = str(name)
         for code in normalized:
-            if code not in labels and code in SAMPLE_NAMES:
-                labels[code] = SAMPLE_NAMES[code][0]
             labels.setdefault(code, code)
         return labels
 
