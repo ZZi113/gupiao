@@ -33,7 +33,7 @@ from .strategy_skills import STRATEGY_LIBRARY, evaluate_strategy_skills
 
 
 PAGES = ["研究", "组合", "发现", "回测", "规则"]
-DISCOVERY_SCHEMA_VERSION = 5
+DISCOVERY_SCHEMA_VERSION = 6
 
 
 def main() -> None:
@@ -679,37 +679,32 @@ def fetch_result(code: str, labels: dict[str, str], days: int, realtime: bool, r
 
 
 def render_research_page(codes: list[str], labels: dict[str, str], days: int, realtime: bool, refresh_key: int, holdings: pd.DataFrame) -> None:
-    controls = st.columns([1.5, 1, 1])
+    controls = st.columns([1.5, 1])
     selected_code = controls[0].selectbox("研究标的", codes, format_func=lambda code: format_stock_option(code, labels))
-    detail_level = controls[1].selectbox("数据深度", ["analysis", "full"], index=0, format_func=lambda value: "快速研究" if value == "analysis" else "完整情报")
-    controls[2].metric("股票池", len(codes))
+    controls[1].metric("股票池", len(codes))
 
     holding = holding_map_from_table(holdings).get(selected_code)
     with st.spinner(f"正在拉取真实数据：{format_stock_option(selected_code, labels)}"):
         try:
-            result = fetch_result(selected_code, labels, days, realtime, refresh_key, detail_level, holding)
+            result = fetch_result(selected_code, labels, days, realtime, refresh_key, "full", holding)
         except Exception as exc:
             st.error(f"{selected_code} 真实数据获取失败：{type(exc).__name__}。系统未使用演示数据，请稍后重试或切换标的。")
             return
     strategies = evaluate_strategy_skills(result)
     dashboard = build_decision_dashboard(result, strategies)
 
-    st.markdown('<div class="hero-grid">', unsafe_allow_html=True)
-    left, right = st.columns([1.65, 0.9], gap="medium")
-    with left:
-        render_price_chart(result)
-    with right:
-        render_decision_card(dashboard)
-    st.markdown("</div>", unsafe_allow_html=True)
+    render_price_chart(result)
+    render_decision_card(dashboard)
 
     render_sniper_points(dashboard)
-    render_strategy_panel(strategies)
 
-    report_tab, data_tab, agent_tab = st.tabs(["决策报告", "数据透视", "多角色复核"])
+    report_tab, data_tab, strategy_tab, agent_tab = st.tabs(["详细报告", "数据明细", "策略明细", "多角色复核"])
     with report_tab:
         render_report_blocks(dashboard)
     with data_tab:
         render_component_table(result)
+    with strategy_tab:
+        render_strategy_table(strategies)
     with agent_tab:
         review = build_agent_review(result)
         render_agent_review(review)
@@ -725,6 +720,7 @@ def render_price_chart(result: dict) -> None:
         st.info("行情字段不完整。")
         return
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    chart_df = df.tail(180).copy() if len(df) > 180 else df
 
     fig = make_subplots(
         rows=2,
@@ -735,25 +731,25 @@ def render_price_chart(result: dict) -> None:
     )
     fig.add_trace(
         go.Candlestick(
-            x=df["date"],
-            open=df["open"],
-            high=df["high"],
-            low=df["low"],
-            close=df["close"],
+            x=chart_df["date"],
+            open=chart_df["open"],
+            high=chart_df["high"],
+            low=chart_df["low"],
+            close=chart_df["close"],
             name="K线",
-            increasing_line_color="#ef4444",
+            increasing_line_color="#dc2626",
             decreasing_line_color="#16a34a",
-            increasing_fillcolor="#ef4444",
+            increasing_fillcolor="#dc2626",
             decreasing_fillcolor="#16a34a",
         ),
         row=1,
         col=1,
     )
     for col, color in [("ma5", "#f59e0b"), ("ma20", "#38bdf8"), ("ma60", "#a78bfa")]:
-        if col in df:
-            fig.add_trace(go.Scatter(x=df["date"], y=df[col], mode="lines", name=col.upper(), line=dict(color=color, width=1.6)), row=1, col=1)
-    volume_colors = ["rgba(239,68,68,.58)" if c >= o else "rgba(22,163,74,.58)" for o, c in zip(df["open"], df["close"])]
-    fig.add_trace(go.Bar(x=df["date"], y=df.get("volume", pd.Series([0] * len(df))), marker_color=volume_colors, name="成交量"), row=2, col=1)
+        if col in chart_df:
+            fig.add_trace(go.Scatter(x=chart_df["date"], y=chart_df[col], mode="lines", name=col.upper(), line=dict(color=color, width=2.0)), row=1, col=1)
+    volume_colors = ["rgba(220,38,38,.62)" if c >= o else "rgba(22,163,74,.62)" for o, c in zip(chart_df["open"], chart_df["close"])]
+    fig.add_trace(go.Bar(x=chart_df["date"], y=chart_df.get("volume", pd.Series([0] * len(chart_df))), marker_color=volume_colors, name="成交量"), row=2, col=1)
     levels = result.get("levels") or {}
     for key, label, color in [
         ("conservative_entry", "稳健买点", "#38bdf8"),
@@ -765,18 +761,20 @@ def render_price_chart(result: dict) -> None:
         if value is not None and pd.notna(value):
             fig.add_hline(y=float(value), line_width=1, line_dash="dot", line_color=color, annotation_text=label, row=1, col=1)
     fig.update_layout(
-        height=620,
-        margin=dict(l=8, r=8, t=28, b=8),
-        template="plotly_dark",
-        paper_bgcolor="#0b1220",
-        plot_bgcolor="#0b1220",
+        height=780,
+        margin=dict(l=16, r=72, t=54, b=18),
+        template="plotly_white",
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
         title=f"{result.get('code')} {result.get('name')} / {result.get('action_label')} / {result.get('score'):.1f}",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
+        legend=dict(orientation="h", yanchor="bottom", y=1.01, x=0, font=dict(size=13)),
         xaxis_rangeslider_visible=False,
         hovermode="x unified",
+        font=dict(color="#0f172a", size=13),
+        dragmode="pan",
     )
-    fig.update_xaxes(showgrid=True, gridcolor="rgba(148,163,184,.16)")
-    fig.update_yaxes(showgrid=True, gridcolor="rgba(148,163,184,.16)")
+    fig.update_xaxes(showgrid=True, gridcolor="rgba(148,163,184,.25)", tickfont=dict(size=12))
+    fig.update_yaxes(showgrid=True, gridcolor="rgba(148,163,184,.25)", tickfont=dict(size=12), side="right")
     st.plotly_chart(fig, use_container_width=True)
 
 
@@ -842,17 +840,21 @@ def render_strategy_panel(strategies: list[dict]) -> None:
 
 
 def render_report_blocks(dashboard: dict) -> None:
+    core = dashboard["core_conclusion"]
     intel = dashboard["intelligence"]
     plan = dashboard["battle_plan"]
     left, right = st.columns(2)
     with left:
-        st.markdown("#### 情报速览")
-        st.markdown(f"<div class='dsa-card-flat report-block'>{escape(intel['latest_news'])}</div>", unsafe_allow_html=True)
-        st.markdown("#### 利好催化")
+        st.markdown("#### 结论与仓位")
+        advice = core["position_advice"]
+        st.write(f"- 空仓：{advice['no_position']}")
+        st.write(f"- 已持有：{advice['holding']}")
+        st.write(f"- 一句话：{core.get('one_sentence', '')}")
+        st.markdown("#### 催化因素")
         for item in intel["positive_catalysts"]:
             st.write(f"- {item}")
     with right:
-        st.markdown("#### 风险警报")
+        st.markdown("#### 风险清单")
         for item in intel["risk_alerts"]:
             st.write(f"- {item}")
         st.markdown("#### 操作检查清单")
@@ -875,6 +877,21 @@ def render_component_table(result: dict) -> None:
     st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
     metrics = result.get("metrics") or {}
     st.dataframe(pd.DataFrame(metrics.items(), columns=["指标", "数值"]), hide_index=True, use_container_width=True)
+
+
+def render_strategy_table(strategies: list[dict]) -> None:
+    rows = []
+    for item in strategies:
+        rows.append(
+            {
+                "策略": item.get("display_name"),
+                "分数": item.get("score"),
+                "状态": item.get("tone"),
+                "触发": "是" if item.get("matched") else "否",
+                "依据": _join(item.get("reasons")),
+            }
+        )
+    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
 
 
 def render_agent_review(review: dict) -> None:
@@ -968,11 +985,9 @@ def render_discovery_page(days: int, realtime: bool, refresh_key: int) -> None:
     if submitted:
         with st.spinner("正在实时拉取全市场快照，本次不读取本地缓存..."):
             snapshot, source, warnings = load_market_snapshot_fresh(force_refresh=True)
-        if warnings:
-            for warning in warnings:
-                st.warning(warning)
         if "不可用" in source or snapshot.empty:
-            st.error("真实全市场快照不可用，已停止筛选，不使用演示候选池。")
+            reason = f"：{warnings[0]}" if warnings else ""
+            st.error(f"真实全市场快照不可用{reason}。已停止筛选，不使用演示候选池。")
             return
         candidates = screen_market_candidates(snapshot, mode=mode, limit=limit)
         if isinstance(candidates, pd.DataFrame) and not candidates.empty and "行情初筛" in set(candidates.get("复核状态", pd.Series(dtype=str)).astype(str)):
@@ -985,7 +1000,7 @@ def render_discovery_page(days: int, realtime: bool, refresh_key: int) -> None:
                     limit=show_count,
                 )
             if enrich_warnings:
-                st.caption("；".join(enrich_warnings[:3]))
+                st.caption(f"部分候选无法补全历史字段：{len(enrich_warnings)} 只。")
         st.session_state["discovery_candidates"] = candidates.head(show_count)
         st.session_state["discovery_source"] = source
         st.session_state["discovery_deep_count"] = deep_count
@@ -994,9 +1009,9 @@ def render_discovery_page(days: int, realtime: bool, refresh_key: int) -> None:
     candidates = st.session_state.get("discovery_candidates", pd.DataFrame())
     st.caption(f"数据源：{source}")
     if isinstance(candidates, pd.DataFrame) and candidates.empty:
-        st.warning("当前真实快照没有命中候选。若使用新浪备用源，PE/PB、市值、60日涨跌幅等增强字段可能不可用，系统会保留真实数据原则，不补造候选。")
+        st.warning("当前真实快照没有命中候选。系统不会使用演示数据或补造候选。")
     elif isinstance(candidates, pd.DataFrame) and "行情初筛" in set(candidates.get("复核状态", pd.Series(dtype=str)).astype(str)):
-        st.info("当前候选来自降级行情快照，只能作为流动性和涨跌幅初筛；PE/PB、市值、60日趋势等缺失字段不会被补造，需进入单股研究页做完整复核。")
+        st.info("当前全市场快照不含估值/市值字段，已用真实单股历史行情补全可计算字段；PE/PB、市值不会补造。")
     st.dataframe(make_discovery_table(candidates), hide_index=True, use_container_width=True, height=430)
 
     deep_count = int(st.session_state.get("discovery_deep_count", 0))

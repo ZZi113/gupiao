@@ -241,39 +241,17 @@ def load_market_snapshot(force_refresh: bool = False) -> tuple[pd.DataFrame, str
             return df, source, []
 
     warnings: list[str] = []
-    eastmoney_error_type = ""
-    try:
-        df = _load_spot_eastmoney_direct()
-        if isinstance(df, pd.DataFrame) and not df.empty:
-            _save_market_snapshot_file_cache(df)
-            return df.copy(), f"东方财富全A快照直连 {datetime.now():%H:%M:%S}", warnings
-    except Exception as exc:
-        eastmoney_error_type = type(exc).__name__
-        warnings.append(f"东方财富全A直连不可用：{type(exc).__name__}")
-
     provider = DataProvider()
     if provider.ak is None:
-        warnings.append("未安装 AKShare，已跳过 AKShare 备用全市场快照。")
-        return pd.DataFrame(), "真实全市场快照不可用", warnings
+        return pd.DataFrame(), "真实全市场快照不可用：未安装 AKShare", warnings
 
-    if eastmoney_error_type not in {"ConnectionError", "ProxyError", "ConnectTimeout", "ReadTimeout", "Timeout"}:
-        try:
-            df = provider.ak.stock_zh_a_spot_em()
-            if isinstance(df, pd.DataFrame) and not df.empty:
-                _save_market_snapshot_file_cache(df)
-                return df.copy(), f"AKShare东方财富全A快照 {datetime.now():%H:%M:%S}", warnings
-        except Exception as exc:
-            warnings.append(f"AKShare全市场快照不可用：{type(exc).__name__}")
-    else:
-        warnings.append("已跳过 AKShare 东方财富备用源，避免重复等待同一个不可用接口。")
     try:
         df = provider.ak.stock_zh_a_spot()
         if isinstance(df, pd.DataFrame) and not df.empty:
             _save_market_snapshot_file_cache(df)
-            return df.copy(), f"AKShare新浪全A快照 {datetime.now():%H:%M:%S}", warnings
+            return df.copy(), f"AKShare新浪实时全A快照 {datetime.now():%H:%M:%S}", warnings
     except Exception as exc:
-        warnings.append(f"AKShare新浪全A快照不可用：{type(exc).__name__}")
-    warnings.append("所有真实全市场快照源均不可用，未使用演示候选池。")
+        warnings.append(f"新浪全A快照拉取失败：{type(exc).__name__}")
     return pd.DataFrame(), "真实全市场快照不可用", warnings
 
 
